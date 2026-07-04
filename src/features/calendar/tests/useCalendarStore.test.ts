@@ -17,7 +17,10 @@ beforeEach(() => {
     isExpanded: false,
     selectedEvent: null,
     isDrawerOpen: false,
+    selectedActivity: null,
+    isActivityDetailOpen: false,
     events: [],
+    activities: [],
   });
 });
 

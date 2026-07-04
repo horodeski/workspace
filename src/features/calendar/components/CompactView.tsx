@@ -36,6 +36,7 @@ export function CompactView() {
           {dateLabel}
         </h2>
       </div>
+
       <div ref={containerRef} className="flex-1 overflow-y-auto relative">
         <div className="relative" style={{ height: GRID_HEIGHT }}>
           {/* Hour lines */}

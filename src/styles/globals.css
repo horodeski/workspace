@@ -85,3 +85,64 @@
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
+
+/* Tiptap editor styles */
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #71717a;
+  pointer-events: none;
+  height: 0;
+}
+
+.tiptap {
+  outline: none;
+}
+
+.tiptap h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-top: 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.tiptap h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-top: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.tiptap p {
+  margin-bottom: 0.5rem;
+}
+
+.tiptap ul,
+.tiptap ol {
+  padding-left: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.tiptap ul {
+  list-style-type: disc;
+}
+
+.tiptap ol {
+  list-style-type: decimal;
+}
+
+.tiptap li {
+  margin-bottom: 0.25rem;
+}
+
+.tiptap strong {
+  font-weight: 700;
+}
+
+.tiptap em {
+  font-style: italic;
+}
+
+.tiptap u {
+  text-decoration: underline;
+}

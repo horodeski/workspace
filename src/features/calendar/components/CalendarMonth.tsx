@@ -3,14 +3,16 @@ import {
   startOfWeek,
   addDays,
   isSameMonth,
+  isSameDay,
   isToday,
   format,
   parseISO,
   startOfDay,
   endOfDay,
 } from 'date-fns';
-import { CalendarEventType } from '../types/calendar.types';
+import { CalendarEventType, PriorityType } from '../types/calendar.types';
 import { useCalendarStore } from '../hooks/useCalendarStore';
+import { Badge } from '@/components/ui/badge';
 
 interface CalendarMonthProps {
   month: Date;
@@ -19,9 +21,23 @@ interface CalendarMonthProps {
 
 const WEEKDAYS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 
+function getPriorityBadgeVariant(priority: PriorityType | null, completed: boolean): 'success' | 'secondary' | 'warning' | 'destructive' | 'default' {
+  if (completed) return 'success';
+  if (!priority) return 'secondary';
+  switch (priority) {
+    case 'urgent': return 'destructive';
+    case 'high': return 'warning';
+    case 'medium': return 'secondary';
+    case 'low': return 'default';
+  }
+}
+
 export function CalendarMonth({ month, events }: CalendarMonthProps) {
+  const selectedDate = useCalendarStore((state) => state.selectedDate);
   const setSelectedDate = useCalendarStore((state) => state.setSelectedDate);
-  const setViewMode = useCalendarStore((state) => state.setViewMode);
+  // Subscribe to activities to re-render when they change
+  useCalendarStore((state) => state.activities);
+  const getActivitiesForDate = useCalendarStore((state) => state.getActivitiesForDate);
 
   // Generate 42 cells (6 weeks × 7 days)
   const monthStart = startOfMonth(month);
@@ -40,7 +56,6 @@ export function CalendarMonth({ month, events }: CalendarMonthProps) {
 
   const handleDayClick = (day: Date) => {
     setSelectedDate(day);
-    setViewMode('day');
   };
 
   return (
@@ -61,16 +76,18 @@ export function CalendarMonth({ month, events }: CalendarMonthProps) {
       <div className="grid grid-cols-7 flex-1 gap-px">
         {cells.map((day, i) => {
           const dayEvents = getEventsForDay(day);
+          const dayActivities = getActivitiesForDate(day);
           const inCurrentMonth = isSameMonth(day, month);
           const today = isToday(day);
+          const isSelected = isSameDay(day, selectedDate);
 
           return (
             <div
               key={i}
               onClick={() => handleDayClick(day)}
-              className={`p-1 min-h-[4rem] border border-zinc-800 rounded cursor-pointer hover:bg-zinc-800/50 transition-colors ${
+              className={`p-1 min-h-[4rem] border rounded cursor-pointer hover:bg-zinc-800/50 transition-colors overflow-hidden ${
                 !inCurrentMonth ? 'opacity-40' : ''
-              } ${today ? 'bg-blue-500/10 border-blue-500/50' : ''}`}
+              } ${isSelected ? 'bg-blue-500/15 border-blue-500/70 ring-1 ring-blue-500/30' : 'border-zinc-800'} ${today && !isSelected ? 'bg-blue-500/10 border-blue-500/50' : ''}`}
             >
               <span
                 className={`text-sm ${
@@ -82,17 +99,39 @@ export function CalendarMonth({ month, events }: CalendarMonthProps) {
 
               {/* Event indicators */}
               {dayEvents.length > 0 && (
-                <div className="flex flex-wrap gap-0.5 mt-1">
-                  {dayEvents.slice(0, 3).map((event) => (
+                <div className="flex flex-wrap gap-0.5 mt-0.5">
+                  {dayEvents.slice(0, 2).map((event) => (
                     <div
                       key={event.id}
                       className="w-2 h-2 rounded-full"
                       style={{ backgroundColor: event.color }}
                     />
                   ))}
-                  {dayEvents.length > 3 && (
-                    <span className="text-xs text-zinc-500">
-                      +{dayEvents.length - 3}
+                  {dayEvents.length > 2 && (
+                    <span className="text-[10px] text-zinc-500">
+                      +{dayEvents.length - 2}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Activity badges */}
+              {dayActivities.length > 0 && (
+                <div className="flex flex-col gap-0.5 mt-0.5">
+                  {dayActivities.slice(0, 2).map((activity) => (
+                    <Badge
+                      key={activity.id}
+                      variant={getPriorityBadgeVariant(activity.priority, activity.completed)}
+                      className={`text-[9px] px-1 py-0 truncate max-w-full block ${
+                        activity.completed ? 'line-through opacity-60' : ''
+                      }`}
+                    >
+                      {activity.title}
+                    </Badge>
+                  ))}
+                  {dayActivities.length > 2 && (
+                    <span className="text-[10px] text-zinc-500 pl-0.5">
+                      +{dayActivities.length - 2}
                     </span>
                   )}
                 </div>

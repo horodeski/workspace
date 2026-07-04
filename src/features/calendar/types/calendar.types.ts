@@ -6,6 +6,51 @@ export type EventCategory = 'work' | 'personal' | 'health' | 'meeting' | 'other'
 
 export type ViewMode = 'day' | 'week' | 'month';
 
+// --- Activity types ---
+
+export type RecurrenceType = 'none' | 'weekday' | 'daily' | 'weekly' | 'monthly';
+
+export type PriorityType = 'low' | 'medium' | 'high' | 'urgent';
+
+export interface ActivityAttachment {
+  id: string;
+  name: string;
+  url: string; // object URL or data URL
+  type: string; // MIME type
+  size: number; // bytes
+}
+
+export interface Activity {
+  id: string;
+  title: string;
+  description: string; // rich text HTML
+  completed: boolean;
+  date: string; // ISO 8601 date (YYYY-MM-DD)
+  startTime: string | null; // HH:mm or null (all-day)
+  duration: number | null; // duration in minutes, or null
+  recurrence: RecurrenceType;
+  priority: PriorityType | null; // optional
+  attachments: ActivityAttachment[];
+  createdAt: string; // ISO 8601
+  updatedAt: string; // ISO 8601
+}
+
+export const activitySchema = z.object({
+  title: z
+    .string()
+    .min(1, 'O título é obrigatório')
+    .max(200, 'O título deve ter no máximo 200 caracteres')
+    .refine((val) => val.trim().length > 0, 'O título não pode conter apenas espaços'),
+  description: z.string().default(''),
+  date: z.string().min(1, 'A data é obrigatória'),
+  startTime: z.string().nullable().default(null),
+  duration: z.number().nullable().default(null),
+  recurrence: z.enum(['none', 'weekday', 'daily', 'weekly', 'monthly']).default('weekday'),
+  priority: z.enum(['low', 'medium', 'high', 'urgent']).nullable().default(null),
+});
+
+export type ActivityFormData = z.infer<typeof activitySchema>;
+
 export interface CalendarEventType {
   id: string;
   title: string;

@@ -1,10 +1,10 @@
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from '@/components/ui/sheet';
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import { useCalendarStore } from '../hooks/useCalendarStore';
 import { EventForm } from './EventForm';
 import { CalendarEventFormData } from '../types/calendar.types';
@@ -27,14 +27,14 @@ export function EventDrawer() {
   };
 
   return (
-    <Sheet open={isDrawerOpen && !!selectedEvent} onOpenChange={(open: boolean) => { if (!open) closeDrawer(); }}>
-      <SheetContent side="right" className="w-96 overflow-y-auto" aria-label="Editar evento">
-        <SheetHeader>
-          <SheetTitle>Editar Evento</SheetTitle>
-          <SheetDescription className="sr-only">
+    <Dialog open={isDrawerOpen && !!selectedEvent} onOpenChange={(open: boolean) => { if (!open) closeDrawer(); }}>
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto" aria-label="Editar evento">
+        <DialogHeader>
+          <DialogTitle>Editar Evento</DialogTitle>
+          <DialogDescription className="sr-only">
             Formulário para editar evento do calendário
-          </SheetDescription>
-        </SheetHeader>
+          </DialogDescription>
+        </DialogHeader>
 
         {selectedEvent && (
           <EventForm
@@ -44,7 +44,7 @@ export function EventDrawer() {
             onClose={closeDrawer}
           />
         )}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
