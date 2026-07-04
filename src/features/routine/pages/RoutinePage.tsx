@@ -5,8 +5,10 @@ import { ListChecks } from 'lucide-react';
 
 import { PageHeader } from '../../../components/PageHeader';
 import { EmptyState } from '../../../components/EmptyState';
-import { Input } from '../../../components/Input';
+import { Input } from '@/components/Input';
 import { Button } from '../../../components/Button';
+import { Card, CardContent } from '@/components/ui/card';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { RoutineCard } from '../components/RoutineCard';
 import { useRoutineStore } from '../hooks/useRoutineStore';
 import {
@@ -14,7 +16,6 @@ import {
   RoutineFormData,
   Frequency,
 } from '../types/routine.types';
-import { cn } from '../../../lib/utils';
 
 const frequencyOptions: { value: Frequency; label: string }[] = [
   { value: 'daily', label: 'Diária' },
@@ -58,49 +59,49 @@ export const RoutinePage: React.FC = () => {
         description="Gerencie suas atividades recorrentes"
       />
 
-      <form
-        onSubmit={handleSubmit(onSubmit)}
-        className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4"
-      >
-        <Input
-          {...titleRegister}
-          ref={(e) => {
-            formRef(e);
-            titleInputRef.current = e;
-          }}
-          label="Título da rotina"
-          placeholder="Ex: Daily standup, Code review..."
-          maxLength={100}
-          error={errors.title?.message}
-        />
+      <Card>
+        <CardContent className="p-4 pt-4">
+          <form
+            onSubmit={handleSubmit(onSubmit)}
+            className="flex flex-col gap-4"
+          >
+            <Input
+              {...titleRegister}
+              ref={(e) => {
+                formRef(e);
+                titleInputRef.current = e;
+              }}
+              label="Título da rotina"
+              placeholder="Ex: Daily standup, Code review..."
+              maxLength={100}
+              error={errors.title?.message}
+            />
 
-        <div className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium text-foreground">
-            Frequência
-          </span>
-          <div className="flex gap-2">
-            {frequencyOptions.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => setValue('frequency', option.value)}
-                className={cn(
-                  'rounded-md border px-3 py-1.5 text-sm font-medium transition-colors',
-                  selectedFrequency === option.value
-                    ? 'border-primary bg-primary text-primary-foreground'
-                    : 'border-border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                )}
+            <div className="flex flex-col gap-1.5">
+              <span className="text-sm font-medium text-foreground">
+                Frequência
+              </span>
+              <ToggleGroup
+                type="single"
+                value={selectedFrequency}
+                onValueChange={(value) => {
+                  if (value) setValue('frequency', value as Frequency);
+                }}
               >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        </div>
+                {frequencyOptions.map((option) => (
+                  <ToggleGroupItem key={option.value} value={option.value}>
+                    {option.label}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+            </div>
 
-        <Button type="submit" variant="primary" size="md" className="self-end">
-          Adicionar rotina
-        </Button>
-      </form>
+            <Button type="submit" variant="primary" size="md" className="self-end">
+              Adicionar rotina
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
 
       {routines.length === 0 ? (
         <EmptyState

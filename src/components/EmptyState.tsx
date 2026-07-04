@@ -1,6 +1,6 @@
 import React from 'react';
 import { cn } from '../lib/utils';
-import { Button } from './Button';
+import { Button } from '@/components/ui/button';
 
 export interface EmptyStateProps {
   icon?: React.ReactNode;
@@ -37,7 +37,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
       </p>
       {action && (
         <Button
-          variant="primary"
+          variant="default"
           size="sm"
           className="mt-6"
           onClick={action.onClick}

@@ -1,5 +1,6 @@
 import React from 'react';
-import { cn } from '../../../lib/utils';
+import { Card, CardHeader, CardContent } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
 import type { JournalEntry } from '../types/journal.types';
 
 export interface JournalCardProps {
@@ -19,22 +20,17 @@ function formatDate(isoDate: string): string {
 
 export const JournalCard: React.FC<JournalCardProps> = ({ entry }) => {
   return (
-    <div
-      className={cn(
-        'rounded-lg border border-border bg-card p-4',
-        'flex flex-col gap-3'
-      )}
-    >
-      <div className="flex items-center justify-between">
+    <Card>
+      <CardHeader>
         <time
           className="text-xs text-muted-foreground"
           dateTime={entry.createdAt}
         >
           {formatDate(entry.createdAt)}
         </time>
-      </div>
+      </CardHeader>
 
-      <div className="flex flex-col gap-3">
+      <CardContent className="flex flex-col gap-3">
         <section>
           <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
             Original
@@ -44,7 +40,7 @@ export const JournalCard: React.FC<JournalCardProps> = ({ entry }) => {
           </p>
         </section>
 
-        <div className="border-t border-border" />
+        <Separator />
 
         <section>
           <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
@@ -54,7 +50,7 @@ export const JournalCard: React.FC<JournalCardProps> = ({ entry }) => {
             {entry.formattedText}
           </p>
         </section>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 };

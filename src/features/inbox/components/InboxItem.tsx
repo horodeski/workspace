@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Pencil, Trash2, Check, X } from 'lucide-react';
 import { cn } from '../../../lib/utils';
+import { Card } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { InboxTask } from '../types/inbox.types';
 
 export interface InboxItemProps {
@@ -46,19 +48,18 @@ export const InboxItem: React.FC<InboxItemProps> = ({
   };
 
   return (
-    <div
+    <Card
       className={cn(
-        'group flex items-center gap-3 rounded-md border border-border bg-card px-3 py-2 transition-colors',
+        'group flex items-center gap-3 px-3 py-2 transition-colors',
         'hover:bg-accent/50',
         task.completed && 'opacity-50'
       )}
     >
-      <input
-        type="checkbox"
+      <Checkbox
         checked={task.completed}
-        onChange={() => onToggleComplete(task.id)}
-        className="h-4 w-4 shrink-0 cursor-pointer rounded border-border bg-background accent-primary"
+        onCheckedChange={() => onToggleComplete(task.id)}
         aria-label={`Marcar "${task.text}" como ${task.completed ? 'pendente' : 'concluída'}`}
+        className="cursor-pointer"
       />
 
       {isEditing ? (
@@ -120,7 +121,7 @@ export const InboxItem: React.FC<InboxItemProps> = ({
           </div>
         </>
       )}
-    </div>
+    </Card>
   );
 };
 

@@ -1,5 +1,7 @@
 import React from 'react';
-import { Badge } from '../../../components/Badge';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '../../../lib/utils';
 import { Frequency, Routine } from '../types/routine.types';
 
@@ -14,8 +16,8 @@ const frequencyLabel: Record<Frequency, string> = {
   sprint: 'Sprint',
 };
 
-const frequencyVariant: Record<Frequency, 'default' | 'success' | 'warning'> = {
-  daily: 'default',
+const frequencyVariant: Record<Frequency, 'secondary' | 'success' | 'warning'> = {
+  daily: 'secondary',
   weekly: 'success',
   sprint: 'warning',
 };
@@ -25,33 +27,34 @@ export const RoutineCard: React.FC<RoutineCardProps> = ({
   onToggleComplete,
 }) => {
   return (
-    <div
+    <Card
       className={cn(
-        'flex items-center gap-3 rounded-lg border border-border bg-card p-4 transition-all',
+        'rounded-lg shadow-none transition-all',
         routine.completed && 'opacity-50'
       )}
     >
-      <input
-        type="checkbox"
-        checked={routine.completed}
-        onChange={() => onToggleComplete(routine.id)}
-        className="h-4 w-4 rounded border-border bg-background accent-primary cursor-pointer"
-        aria-label={`Marcar "${routine.title}" como ${routine.completed ? 'pendente' : 'concluída'}`}
-      />
+      <CardContent className="flex items-center gap-3 p-4">
+        <Checkbox
+          checked={routine.completed}
+          onCheckedChange={() => onToggleComplete(routine.id)}
+          aria-label={`Marcar "${routine.title}" como ${routine.completed ? 'pendente' : 'concluída'}`}
+          className="cursor-pointer"
+        />
 
-      <span
-        className={cn(
-          'flex-1 text-sm text-foreground',
-          routine.completed && 'line-through text-muted-foreground'
-        )}
-      >
-        {routine.title}
-      </span>
+        <span
+          className={cn(
+            'flex-1 text-sm text-foreground',
+            routine.completed && 'line-through text-muted-foreground'
+          )}
+        >
+          {routine.title}
+        </span>
 
-      <Badge variant={frequencyVariant[routine.frequency]}>
-        {frequencyLabel[routine.frequency]}
-      </Badge>
-    </div>
+        <Badge variant={frequencyVariant[routine.frequency]}>
+          {frequencyLabel[routine.frequency]}
+        </Badge>
+      </CardContent>
+    </Card>
   );
 };
 

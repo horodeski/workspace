@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Inbox } from 'lucide-react';
 import { PageHeader } from '../../../components/PageHeader';
 import { EmptyState } from '../../../components/EmptyState';
-import { Input } from '../../../components/Input';
+import { Input } from '@/components/Input';
 import { InboxItem } from '../components/InboxItem';
 import { useInboxStore } from '../hooks/useInboxStore';
 
