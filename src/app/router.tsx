@@ -6,6 +6,8 @@ import { InboxPage } from '../features/inbox/pages/InboxPage';
 import { JournalPage } from '../features/journal/pages/JournalPage';
 import { ReportsPage } from '../features/reports/pages/ReportsPage';
 import { InspirationBoardPage } from '../features/inspiration-board/pages/InspirationBoardPage';
+import { WeeklyReviewPage } from '../features/weekly-review/pages/WeeklyReviewPage';
+import { WeeklyReviewEditPage } from '../features/weekly-review/pages/WeeklyReviewEditPage';
 import { NotFoundPage } from './NotFoundPage';
 
 export const router = createBrowserRouter([
@@ -18,6 +20,8 @@ export const router = createBrowserRouter([
       { path: '/journal', element: <JournalPage /> },
       { path: '/reports', element: <ReportsPage /> },
       { path: '/inspiration', element: <InspirationBoardPage /> },
+      { path: '/weekly-review', element: <WeeklyReviewPage /> },
+      { path: '/weekly-review/:year/:week', element: <WeeklyReviewEditPage /> },
     ],
   },
   {

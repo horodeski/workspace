@@ -25,6 +25,7 @@ const sidebarItems: SidebarItem[] = [
   { label: 'Ideias', path: '/inbox', icon: Inbox },
   { label: 'Inspiração', path: '/inspiration', icon: Lightbulb },
   // { label: 'Journal', path: '/journal', icon: BookOpen },
+  { label: 'Weekly Review', path: '/weekly-review', icon: BookOpen },
   { label: 'Relatórios', path: '/reports', icon: BarChart3 },
   // { label: 'Configurações', path: '/settings', icon: Settings },
 ];
