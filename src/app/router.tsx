@@ -5,6 +5,7 @@ import { RoutinePage } from '../features/routine/pages/RoutinePage';
 import { InboxPage } from '../features/inbox/pages/InboxPage';
 import { JournalPage } from '../features/journal/pages/JournalPage';
 import { ReportsPage } from '../features/reports/pages/ReportsPage';
+import { InspirationBoardPage } from '../features/inspiration-board/pages/InspirationBoardPage';
 import { NotFoundPage } from './NotFoundPage';
 
 export const router = createBrowserRouter([
@@ -16,6 +17,7 @@ export const router = createBrowserRouter([
       { path: '/inbox', element: <InboxPage /> },
       { path: '/journal', element: <JournalPage /> },
       { path: '/reports', element: <ReportsPage /> },
+      { path: '/inspiration', element: <InspirationBoardPage /> },
     ],
   },
   {

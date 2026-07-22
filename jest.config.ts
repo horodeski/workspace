@@ -14,9 +14,11 @@ const config: Config = {
   },
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
+    '^framer-motion$': '<rootDir>/src/__mocks__/framer-motion.tsx',
     '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
     '\\.(jpg|jpeg|png|gif|webp|svg)$': '<rootDir>/src/__mocks__/fileMock.ts',
   },
+  setupFiles: ['<rootDir>/src/setupEnv.ts'],
   setupFilesAfterEnv: ['<rootDir>/src/setupTests.ts'],
 };
 

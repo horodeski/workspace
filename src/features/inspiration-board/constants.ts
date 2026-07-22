@@ -1,0 +1,13 @@
+export const CANVAS_WIDTH = 3000;
+export const CANVAS_HEIGHT = 2000;
+export const DEFAULT_CARD_WIDTH = 240;
+export const DEFAULT_CARD_HEIGHT = 180;
+export const MIN_CARD_WIDTH = 120;
+export const MIN_CARD_HEIGHT = 80;
+export const MAX_CARD_WIDTH = 800;
+export const MAX_CARD_HEIGHT = 600;
+export const KEYBOARD_MOVE_STEP = 20;
+export const DEFAULT_POSITION_X_MIN = 100;
+export const DEFAULT_POSITION_X_MAX = 400;
+export const DEFAULT_POSITION_Y_MIN = 100;
+export const DEFAULT_POSITION_Y_MAX = 300;

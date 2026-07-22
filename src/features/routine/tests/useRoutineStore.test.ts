@@ -1,96 +1,106 @@
-import { useRoutineStore } from '../hooks/useRoutineStore';
+import { useSupportCardStore } from '../hooks/useRoutineStore';
 
-describe('useRoutineStore', () => {
+describe('useSupportCardStore', () => {
   beforeEach(() => {
-    useRoutineStore.setState({ routines: [] });
+    useSupportCardStore.setState({ entries: [] });
   });
 
-  describe('addRoutine', () => {
-    it('should add a new routine with correct fields', () => {
-      const { addRoutine } = useRoutineStore.getState();
+  describe('addEntry', () => {
+    it('should add a new entry with correct fields', () => {
+      const { addEntry } = useSupportCardStore.getState();
 
-      addRoutine('Daily standup', 'daily');
+      addEntry({
+        date: '03/02',
+        description: 'Ajudei o Heitor a subir o ambiente',
+        duration: '2h',
+        observation: 'foto da ligação',
+      });
 
-      const { routines } = useRoutineStore.getState();
-      expect(routines).toHaveLength(1);
-      expect(routines[0].title).toBe('Daily standup');
-      expect(routines[0].frequency).toBe('daily');
-      expect(routines[0].completed).toBe(false);
-      expect(routines[0].id).toBeDefined();
-      expect(routines[0].createdAt).toBeDefined();
+      const { entries } = useSupportCardStore.getState();
+      expect(entries).toHaveLength(1);
+      expect(entries[0].date).toBe('03/02');
+      expect(entries[0].description).toBe('Ajudei o Heitor a subir o ambiente');
+      expect(entries[0].duration).toBe('2h');
+      expect(entries[0].observation).toBe('foto da ligação');
+      expect(entries[0].id).toBeDefined();
+      expect(entries[0].createdAt).toBeDefined();
     });
 
-    it('should generate unique IDs for each routine', () => {
-      const { addRoutine } = useRoutineStore.getState();
+    it('should generate unique IDs for each entry', () => {
+      const { addEntry } = useSupportCardStore.getState();
 
-      addRoutine('Task 1', 'daily');
-      addRoutine('Task 2', 'weekly');
+      addEntry({ date: '03/02', description: 'Task 1', duration: '1h', observation: '' });
+      addEntry({ date: '04/02', description: 'Task 2', duration: '30min', observation: '' });
 
-      const { routines } = useRoutineStore.getState();
-      expect(routines[0].id).not.toBe(routines[1].id);
-    });
-  });
-
-  describe('toggleRoutine', () => {
-    it('should toggle a routine from pending to completed', () => {
-      const { addRoutine } = useRoutineStore.getState();
-      addRoutine('Code review', 'daily');
-
-      const { routines } = useRoutineStore.getState();
-      const id = routines[0].id;
-
-      useRoutineStore.getState().toggleRoutine(id);
-
-      const updated = useRoutineStore.getState().routines[0];
-      expect(updated.completed).toBe(true);
-    });
-
-    it('should toggle a routine from completed back to pending', () => {
-      const { addRoutine } = useRoutineStore.getState();
-      addRoutine('Code review', 'daily');
-
-      const { routines } = useRoutineStore.getState();
-      const id = routines[0].id;
-
-      useRoutineStore.getState().toggleRoutine(id);
-      useRoutineStore.getState().toggleRoutine(id);
-
-      const updated = useRoutineStore.getState().routines[0];
-      expect(updated.completed).toBe(false);
+      const { entries } = useSupportCardStore.getState();
+      expect(entries[0].id).not.toBe(entries[1].id);
     });
   });
 
-  describe('removeRoutine', () => {
-    it('should remove a routine by id', () => {
-      const { addRoutine } = useRoutineStore.getState();
-      addRoutine('Task 1', 'daily');
-      addRoutine('Task 2', 'weekly');
+  describe('removeEntry', () => {
+    it('should remove an entry by id', () => {
+      const { addEntry } = useSupportCardStore.getState();
+      addEntry({ date: '03/02', description: 'Task 1', duration: '1h', observation: '' });
+      addEntry({ date: '04/02', description: 'Task 2', duration: '2h', observation: '' });
 
-      const { routines } = useRoutineStore.getState();
-      const idToRemove = routines[0].id;
+      const { entries } = useSupportCardStore.getState();
+      const idToRemove = entries[0].id;
 
-      useRoutineStore.getState().removeRoutine(idToRemove);
+      useSupportCardStore.getState().removeEntry(idToRemove);
 
-      const updated = useRoutineStore.getState().routines;
+      const updated = useSupportCardStore.getState().entries;
       expect(updated).toHaveLength(1);
-      expect(updated[0].title).toBe('Task 2');
+      expect(updated[0].description).toBe('Task 2');
+    });
+  });
+
+  describe('clearEntries', () => {
+    it('should remove all entries', () => {
+      const { addEntry } = useSupportCardStore.getState();
+      addEntry({ date: '03/02', description: 'Task 1', duration: '1h', observation: '' });
+      addEntry({ date: '04/02', description: 'Task 2', duration: '2h', observation: '' });
+
+      useSupportCardStore.getState().clearEntries();
+
+      const { entries } = useSupportCardStore.getState();
+      expect(entries).toHaveLength(0);
+    });
+  });
+
+  describe('getFormattedText', () => {
+    it('should return empty string when no entries', () => {
+      const text = useSupportCardStore.getState().getFormattedText();
+      expect(text).toBe('');
     });
 
-    it('should not affect other routines when removing one', () => {
-      const { addRoutine } = useRoutineStore.getState();
-      addRoutine('Task 1', 'daily');
-      addRoutine('Task 2', 'weekly');
-      addRoutine('Task 3', 'sprint');
+    it('should format a single entry without observation', () => {
+      const { addEntry } = useSupportCardStore.getState();
+      addEntry({ date: '03/02', description: 'Ajudei o Heitor', duration: '2h', observation: '' });
 
-      const { routines } = useRoutineStore.getState();
-      const idToRemove = routines[1].id;
+      const text = useSupportCardStore.getState().getFormattedText();
+      expect(text).toBe('03/02\nAjudei o Heitor por 2h.');
+    });
 
-      useRoutineStore.getState().removeRoutine(idToRemove);
+    it('should format a single entry with observation', () => {
+      const { addEntry } = useSupportCardStore.getState();
+      addEntry({
+        date: '03/02',
+        description: 'Ajudei o Heitor a subir o ambiente',
+        duration: '2h',
+        observation: 'foto da ligação',
+      });
 
-      const updated = useRoutineStore.getState().routines;
-      expect(updated).toHaveLength(2);
-      expect(updated[0].title).toBe('Task 1');
-      expect(updated[1].title).toBe('Task 3');
+      const text = useSupportCardStore.getState().getFormattedText();
+      expect(text).toBe('03/02\nAjudei o Heitor a subir o ambiente por 2h.\nfoto da ligação');
+    });
+
+    it('should separate multiple entries with double newlines', () => {
+      const { addEntry } = useSupportCardStore.getState();
+      addEntry({ date: '03/02', description: 'Task 1', duration: '1h', observation: '' });
+      addEntry({ date: '04/02', description: 'Task 2', duration: '30min', observation: 'nota' });
+
+      const text = useSupportCardStore.getState().getFormattedText();
+      expect(text).toBe('03/02\nTask 1 por 1h.\n\n04/02\nTask 2 por 30min.\nnota');
     });
   });
 });

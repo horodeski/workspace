@@ -197,13 +197,35 @@ export const useCalendarStore = create<CalendarState & CalendarActions>(
     },
 
     navigateForward: () => {
-      const { selectedDate } = get();
-      set({ selectedDate: addMonths(selectedDate, 1) });
+      const { selectedDate, viewMode } = get();
+      switch (viewMode) {
+        case 'day':
+          set({ selectedDate: addDays(selectedDate, 1) });
+          break;
+        case 'week':
+          set({ selectedDate: addDays(selectedDate, 7) });
+          break;
+        case 'month':
+        default:
+          set({ selectedDate: addMonths(selectedDate, 1) });
+          break;
+      }
     },
 
     navigateBack: () => {
-      const { selectedDate } = get();
-      set({ selectedDate: subMonths(selectedDate, 1) });
+      const { selectedDate, viewMode } = get();
+      switch (viewMode) {
+        case 'day':
+          set({ selectedDate: subDays(selectedDate, 1) });
+          break;
+        case 'week':
+          set({ selectedDate: subDays(selectedDate, 7) });
+          break;
+        case 'month':
+        default:
+          set({ selectedDate: subMonths(selectedDate, 1) });
+          break;
+      }
     },
 
     // Activity actions
