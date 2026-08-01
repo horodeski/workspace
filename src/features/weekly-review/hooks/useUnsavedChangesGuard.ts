@@ -1,18 +1,32 @@
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import { useBlocker } from 'react-router-dom';
 
 /**
  * Guards against navigation when there are unsaved changes.
- * Blocks react-router navigation and browser tab close/refresh.
+ * Shows a confirmation dialog for in-app navigation and beforeunload for browser close.
  *
  * @param isDirty - true when the form has unsaved changes
  */
 export function useUnsavedChangesGuard(isDirty: boolean): void {
   // Block react-router navigation when dirty
-  useBlocker(
+  const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
       isDirty && currentLocation.pathname !== nextLocation.pathname
   );
+
+  // Show confirmation when blocker is triggered
+  useEffect(() => {
+    if (blocker.state === 'blocked') {
+      const confirmed = window.confirm(
+        'Você tem alterações não salvas. Deseja sair sem salvar?'
+      );
+      if (confirmed) {
+        blocker.proceed();
+      } else {
+        blocker.reset();
+      }
+    }
+  }, [blocker]);
 
   // Block browser refresh/close when dirty
   useEffect(() => {

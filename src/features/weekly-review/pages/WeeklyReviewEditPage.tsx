@@ -1,10 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { startOfISOWeek, addDays } from 'date-fns';
 
-import { reviewFormSchema, type ReviewFormData } from '../types/review.types';
+import { reviewFormSchema, stripHtml, type ReviewFormData } from '../types/review.types';
 import { useReviewStore } from '../hooks/useReviewStore';
 import { getISOWeekData, formatWeekRange } from '../services/weekCalculation';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
@@ -112,8 +112,32 @@ export const WeeklyReviewEditPage: React.FC = () => {
     mode: 'onChange',
   });
 
-  // Unsaved changes guard: active when form is dirty and review is unlocked
-  useUnsavedChangesGuard(form.formState.isDirty && !isLocked);
+  // Track real dirty state by comparing actual text content (not HTML structure)
+  const hasRealChanges = useCallback(() => {
+    const currentValues = form.getValues();
+    const defaults = form.formState.defaultValues as ReviewFormData | undefined;
+    if (!defaults) return false;
+
+    const fields: (keyof ReviewFormData)[] = ['learning', 'decisions', 'resolvedProblems', 'timeWaste', 'nextWeekFocus'];
+    return fields.some((field) => {
+      const currentText = stripHtml(currentValues[field] || '');
+      const defaultText = stripHtml((defaults[field] as string) || '');
+      return currentText !== defaultText;
+    });
+  }, [form]);
+
+  // Unsaved changes guard: active when form has real content changes and review is unlocked
+  const [isDirty, setIsDirty] = useState(false);
+
+  // Update dirty state whenever form values change
+  React.useEffect(() => {
+    const subscription = form.watch(() => {
+      setIsDirty(hasRealChanges());
+    });
+    return () => subscription.unsubscribe();
+  }, [form, hasRealChanges]);
+
+  useUnsavedChangesGuard(isDirty && !isLocked);
 
   // Redirect if invalid params
   if (!isValidParams || !weekData) {

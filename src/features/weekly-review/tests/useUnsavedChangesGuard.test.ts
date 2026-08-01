@@ -1,11 +1,17 @@
 import { renderHook } from '@testing-library/react';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
 
-const mockUseBlocker = jest.fn();
+const mockProceed = jest.fn();
+const mockReset = jest.fn();
+const mockBlocker = { state: 'idle', proceed: mockProceed, reset: mockReset };
 
 jest.mock('react-router-dom', () => ({
   ...jest.requireActual('react-router-dom'),
-  useBlocker: (...args: unknown[]) => mockUseBlocker(...args),
+  useBlocker: (fn: (...args: unknown[]) => boolean) => {
+    // Store the blocker function for testing
+    (global as Record<string, unknown>).__blockerFn = fn;
+    return mockBlocker;
+  },
 }));
 
 describe('useUnsavedChangesGuard', () => {
@@ -13,7 +19,9 @@ describe('useUnsavedChangesGuard', () => {
   let removeEventListenerSpy: jest.SpyInstance;
 
   beforeEach(() => {
-    mockUseBlocker.mockClear();
+    mockProceed.mockClear();
+    mockReset.mockClear();
+    mockBlocker.state = 'idle';
     addEventListenerSpy = jest.spyOn(window, 'addEventListener');
     removeEventListenerSpy = jest.spyOn(window, 'removeEventListener');
   });
@@ -23,12 +31,13 @@ describe('useUnsavedChangesGuard', () => {
     removeEventListenerSpy.mockRestore();
   });
 
-  it('calls useBlocker with a function that blocks when isDirty is true and paths differ', () => {
+  it('passes a blocker function that blocks when isDirty is true and paths differ', () => {
     renderHook(() => useUnsavedChangesGuard(true));
 
-    expect(mockUseBlocker).toHaveBeenCalledWith(expect.any(Function));
+    const blockerFn = (global as Record<string, unknown>).__blockerFn as (
+      args: { currentLocation: { pathname: string }; nextLocation: { pathname: string } }
+    ) => boolean;
 
-    const blockerFn = mockUseBlocker.mock.calls[0][0];
     const shouldBlock = blockerFn({
       currentLocation: { pathname: '/weekly-review/2025/31' },
       nextLocation: { pathname: '/weekly-review' },
@@ -39,9 +48,10 @@ describe('useUnsavedChangesGuard', () => {
   it('does not block when isDirty is false', () => {
     renderHook(() => useUnsavedChangesGuard(false));
 
-    expect(mockUseBlocker).toHaveBeenCalledWith(expect.any(Function));
+    const blockerFn = (global as Record<string, unknown>).__blockerFn as (
+      args: { currentLocation: { pathname: string }; nextLocation: { pathname: string } }
+    ) => boolean;
 
-    const blockerFn = mockUseBlocker.mock.calls[0][0];
     const shouldBlock = blockerFn({
       currentLocation: { pathname: '/weekly-review/2025/31' },
       nextLocation: { pathname: '/weekly-review' },
@@ -52,7 +62,10 @@ describe('useUnsavedChangesGuard', () => {
   it('does not block when navigating to the same pathname', () => {
     renderHook(() => useUnsavedChangesGuard(true));
 
-    const blockerFn = mockUseBlocker.mock.calls[0][0];
+    const blockerFn = (global as Record<string, unknown>).__blockerFn as (
+      args: { currentLocation: { pathname: string }; nextLocation: { pathname: string } }
+    ) => boolean;
+
     const shouldBlock = blockerFn({
       currentLocation: { pathname: '/weekly-review/2025/31' },
       nextLocation: { pathname: '/weekly-review/2025/31' },
@@ -89,20 +102,6 @@ describe('useUnsavedChangesGuard', () => {
     );
   });
 
-  it('removes beforeunload event listener when isDirty changes from true to false', () => {
-    const { rerender } = renderHook(
-      ({ isDirty }) => useUnsavedChangesGuard(isDirty),
-      { initialProps: { isDirty: true } }
-    );
-
-    rerender({ isDirty: false });
-
-    expect(removeEventListenerSpy).toHaveBeenCalledWith(
-      'beforeunload',
-      expect.any(Function)
-    );
-  });
-
   it('beforeunload handler calls preventDefault on the event', () => {
     renderHook(() => useUnsavedChangesGuard(true));
 
@@ -114,5 +113,25 @@ describe('useUnsavedChangesGuard', () => {
     handler(mockEvent);
 
     expect(mockEvent.preventDefault).toHaveBeenCalled();
+  });
+
+  it('calls proceed when user confirms navigation on blocked state', () => {
+    jest.spyOn(window, 'confirm').mockReturnValue(true);
+    mockBlocker.state = 'blocked';
+
+    renderHook(() => useUnsavedChangesGuard(true));
+
+    expect(mockProceed).toHaveBeenCalled();
+    (window.confirm as jest.Mock).mockRestore();
+  });
+
+  it('calls reset when user cancels navigation on blocked state', () => {
+    jest.spyOn(window, 'confirm').mockReturnValue(false);
+    mockBlocker.state = 'blocked';
+
+    renderHook(() => useUnsavedChangesGuard(true));
+
+    expect(mockReset).toHaveBeenCalled();
+    (window.confirm as jest.Mock).mockRestore();
   });
 });

@@ -22,12 +22,8 @@ interface SidebarItem {
 const sidebarItems: SidebarItem[] = [
   { label: 'Lembretes', path: '/', icon: Calendar },
   { label: 'Card de apoio', path: '/routine', icon: ListChecks },
-  { label: 'Ideias', path: '/inbox', icon: Inbox },
-  { label: 'Inspiração', path: '/inspiration', icon: Lightbulb },
-  // { label: 'Journal', path: '/journal', icon: BookOpen },
+  { label: 'Quadros', path: '/boards', icon: Lightbulb },
   { label: 'Weekly Review', path: '/weekly-review', icon: BookOpen },
-  { label: 'Relatórios', path: '/reports', icon: BarChart3 },
-  // { label: 'Configurações', path: '/settings', icon: Settings },
 ];
 
 export function AppSidebar() {

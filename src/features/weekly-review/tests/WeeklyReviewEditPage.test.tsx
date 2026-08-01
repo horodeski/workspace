@@ -9,7 +9,7 @@ import type { Review } from '../types/review.types';
 const mockNavigate = jest.fn();
 jest.mock('react-router-dom', () => ({
   ...jest.requireActual('react-router-dom'),
-  useBlocker: jest.fn(),
+  useBlocker: () => ({ state: 'idle', proceed: jest.fn(), reset: jest.fn() }),
   Navigate: (props: { to: string; replace?: boolean }) => {
     mockNavigate(props.to);
     return <div data-testid="navigate-redirect">{props.to}</div>;
