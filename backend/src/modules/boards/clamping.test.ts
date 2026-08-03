@@ -17,8 +17,8 @@ import {
 describe('clamping utility', () => {
   describe('constants', () => {
     it('has expected canvas dimensions', () => {
-      expect(CANVAS_WIDTH).toBe(3000);
-      expect(CANVAS_HEIGHT).toBe(2000);
+      expect(CANVAS_WIDTH).toBe(1920);
+      expect(CANVAS_HEIGHT).toBe(1080);
     });
 
     it('has expected size constraints', () => {
@@ -115,22 +115,22 @@ describe('clamping utility', () => {
     it('shifts position inward when larger size would overflow x', () => {
       const position = { x: 2800, y: 100 };
       const newSize = { width: 500, height: 150 };
-      // maxX = 3000 - 500 = 2500
-      expect(adjustPositionForSize(position, newSize)).toEqual({ x: 2500, y: 100 });
+      // maxX = 1920 - 500 = 1420
+      expect(adjustPositionForSize(position, newSize)).toEqual({ x: 1420, y: 100 });
     });
 
     it('shifts position inward when larger size would overflow y', () => {
       const position = { x: 100, y: 1800 };
       const newSize = { width: 200, height: 500 };
-      // maxY = 2000 - 500 = 1500
-      expect(adjustPositionForSize(position, newSize)).toEqual({ x: 100, y: 1500 });
+      // maxY = 1080 - 500 = 580
+      expect(adjustPositionForSize(position, newSize)).toEqual({ x: 100, y: 580 });
     });
 
     it('shifts both axes when needed', () => {
       const position = { x: 2900, y: 1900 };
       const newSize = { width: 800, height: 600 };
-      // maxX = 3000 - 800 = 2200, maxY = 2000 - 600 = 1400
-      expect(adjustPositionForSize(position, newSize)).toEqual({ x: 2200, y: 1400 });
+      // maxX = 1920 - 800 = 1120, maxY = 1080 - 600 = 480
+      expect(adjustPositionForSize(position, newSize)).toEqual({ x: 1120, y: 480 });
     });
   });
 

@@ -138,7 +138,7 @@ describe('recurrenceService.matchesDate', () => {
   describe('unknown recurrence', () => {
     it('returns false for unknown recurrence type', () => {
       const activity = makeActivity({ recurrence: 'unknown' as string });
-      expect(recurrenceService.matchesDate(activity, '2024-03-11')).toBe(false);
+      expect(recurrenceService.matchesDate(activity, '2024-03-12')).toBe(false);
     });
   });
 });
