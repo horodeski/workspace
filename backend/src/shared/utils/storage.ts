@@ -1,8 +1,25 @@
 import { mkdir, writeFile, unlink } from 'node:fs/promises';
-import { extname, join } from 'node:path';
+import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { MultipartFile } from '@fastify/multipart';
 import { PayloadTooLargeError, ValidationError } from '../errors/index.js';
+
+/** Map validated MIME types to safe file extensions */
+const MIME_TO_EXTENSION: Record<string, string> = {
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/webp': '.webp',
+  'application/pdf': '.pdf',
+  'text/plain': '.txt',
+};
+
+/**
+ * Returns a safe file extension derived from a validated MIME type.
+ * Falls back to empty string for unknown types.
+ */
+function mimeToExtension(mimeType: string): string {
+  return MIME_TO_EXTENSION[mimeType] || '';
+}
 
 /** Allowed MIME types for activity attachments */
 export const ACTIVITY_ALLOWED_MIMES = [
@@ -67,7 +84,7 @@ export async function saveFile(
     throw new PayloadTooLargeError(`${maxSizeMB}MB`);
   }
 
-  const ext = extname(file.filename) || '';
+  const ext = mimeToExtension(mimeType);
   const uniqueName = `${randomUUID()}${ext}`;
   const filePath = join(uploadDir, uniqueName);
 

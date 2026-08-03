@@ -1,7 +1,6 @@
 import React from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import Underline from '@tiptap/extension-underline';
 import Placeholder from '@tiptap/extension-placeholder';
 import { Bold, Italic, Underline as UnderlineIcon, List, ListOrdered } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -20,13 +19,13 @@ export interface ReflectionFieldProps {
 }
 
 /**
- * Extracts plain text length from HTML content (strips tags).
+ * Extracts plain text length from HTML content (strips tags via regex).
+ * Uses regex instead of innerHTML to avoid triggering side-effects
+ * (e.g., external image loads from malicious HTML).
  */
 function getTextLength(html: string): number {
   if (!html || html === '<p></p>') return 0;
-  const div = document.createElement('div');
-  div.innerHTML = html;
-  return (div.textContent || '').length;
+  return html.replace(/<[^>]*>/g, '').length;
 }
 
 export const ReflectionField: React.FC<ReflectionFieldProps> = ({
@@ -51,7 +50,6 @@ export const ReflectionField: React.FC<ReflectionFieldProps> = ({
       StarterKit.configure({
         heading: false,
       }),
-      Underline,
       Placeholder.configure({ placeholder }),
     ],
     content: value || '',

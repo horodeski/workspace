@@ -42,7 +42,6 @@ export function stripHtml(html: string): string {
 
 export const reviewFieldSchema = z
   .string()
-  .optional()
   .default('');
 
 export const reviewFormSchema = z

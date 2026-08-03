@@ -31,7 +31,7 @@ export const supportEntrySchema = z.object({
     .string()
     .min(1, 'A duração é obrigatória')
     .max(20, 'A duração deve ter no máximo 20 caracteres'),
-  observation: z.string().max(300, 'A observação deve ter no máximo 300 caracteres').optional().default(''),
+  observation: z.string().max(300, 'A observação deve ter no máximo 300 caracteres').default(''),
 });
 
 export type SupportEntryFormData = z.infer<typeof supportEntrySchema>;

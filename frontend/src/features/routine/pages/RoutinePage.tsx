@@ -1,5 +1,5 @@
 import React from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ClipboardList, Copy, Download, Check, CheckCircle2 } from 'lucide-react';
 
@@ -33,7 +33,7 @@ function downloadDataUrl(dataUrl: string, filename: string) {
 }
 
 export const RoutinePage: React.FC = () => {
-  const { entries, formattedText, isLoading, addEntry, updateEntry, removeEntry, clearEntries, getFormattedText, getAllAttachments, fetchEntries } =
+  const { entries, formattedText, addEntry, updateEntry, removeEntry, clearEntries, getFormattedText, getAllAttachments, fetchEntries } =
     useSupportCardStore();
 
   const [copied, setCopied] = React.useState(false);
@@ -56,7 +56,7 @@ export const RoutinePage: React.FC = () => {
     setFocus,
     formState: { errors },
   } = useForm<SupportEntryFormData>({
-    resolver: zodResolver(supportEntrySchema),
+    resolver: zodResolver(supportEntrySchema) as Resolver<SupportEntryFormData>,
     defaultValues: {
       date: new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
       description: '',
@@ -307,7 +307,7 @@ function EditEntryDialog({
     reset,
     formState: { errors },
   } = useForm<SupportEntryFormData>({
-    resolver: zodResolver(supportEntrySchema),
+    resolver: zodResolver(supportEntrySchema) as Resolver<SupportEntryFormData>,
     defaultValues: {
       date: entry?.date ?? '',
       description: entry?.description ?? '',

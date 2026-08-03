@@ -127,7 +127,7 @@ describe('storage', () => {
       });
     });
 
-    it('handles files without extension', async () => {
+    it('handles files without extension by deriving from MIME type', async () => {
       const file = createMockMultipartFile({
         filename: 'noext',
         mimetype: 'text/plain',
@@ -137,7 +137,8 @@ describe('storage', () => {
       const result = await saveFile(file, testDir, 10, ACTIVITY_ALLOWED_MIMES);
 
       expect(result.name).toBe('noext');
-      expect(result.path).not.toContain('.');
+      // Extension is now derived from MIME type, not from filename
+      expect(result.path).toMatch(/\.txt$/);
       expect(result.size).toBe(7);
     });
 

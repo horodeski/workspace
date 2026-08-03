@@ -38,7 +38,7 @@ export function CalendarMonth({ month, events }: CalendarMonthProps) {
   const setSelectedDate = useCalendarStore((state) => state.setSelectedDate);
   const monthActivities = useCalendarStore((state) => state.monthActivities);
   const activities = useCalendarStore((state) => state.activities);
-  const fetchActivitiesForMonth = useCalendarStore((state) => (state as any).fetchActivitiesForMonth);
+  const fetchActivitiesForMonth = useCalendarStore((state) => state.fetchActivitiesForMonth);
 
   // Fetch activities for the entire month for calendar badges
   useEffect(() => {
@@ -67,7 +67,7 @@ export function CalendarMonth({ month, events }: CalendarMonthProps) {
     // For the selected date, use sidebar activities; for others, use monthActivities
     const source = isSameDay(day, selectedDate) ? activities : monthActivities;
     return source.filter((a) => {
-      const actDate = (a as any).instanceDate || a.date;
+      const actDate = a.instanceDate || a.date;
       return actDate === dateStr;
     });
   };

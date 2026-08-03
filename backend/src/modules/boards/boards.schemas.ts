@@ -20,6 +20,9 @@ const boardItemTypeSchema = z.enum(['quote', 'image', 'link', 'note'], {
   errorMap: () => ({ message: 'Tipo inválido. Deve ser: quote, image, link ou note' }),
 });
 
+/** Dangerous URL schemes that must be rejected for image/link items */
+const DANGEROUS_SCHEMES = /^(javascript|data|vbscript|blob):/i;
+
 const positionSchema = z.object({
   x: z.number().int('A posição X deve ser um número inteiro').min(0, 'A posição X deve ser >= 0'),
   y: z.number().int('A posição Y deve ser um número inteiro').min(0, 'A posição Y deve ser >= 0'),
@@ -50,10 +53,24 @@ export const renameBoardSchema = z.object({
 
 export type RenameBoardInput = z.infer<typeof renameBoardSchema>;
 
-export const createItemSchema = z.object({
-  content: boardItemContentSchema,
-  type: boardItemTypeSchema,
-});
+export const createItemSchema = z
+  .object({
+    content: boardItemContentSchema,
+    type: boardItemTypeSchema,
+  })
+  .refine(
+    (data) => {
+      if (data.type === 'image' || data.type === 'link') {
+        if (DANGEROUS_SCHEMES.test(data.content)) return false;
+        if (!data.content.startsWith('http://') && !data.content.startsWith('https://')) return false;
+      }
+      return true;
+    },
+    {
+      message: 'URLs de itens do tipo image/link devem usar esquema http:// ou https://',
+      path: ['content'],
+    }
+  );
 
 export type CreateItemInput = z.infer<typeof createItemSchema>;
 

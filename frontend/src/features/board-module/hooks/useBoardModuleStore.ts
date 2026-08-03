@@ -8,6 +8,14 @@ import type {
   BoardItemPosition,
   BoardItemSize,
 } from '../types/board.types';
+import {
+  CANVAS_WIDTH,
+  CANVAS_HEIGHT,
+  MIN_ITEM_WIDTH,
+  MIN_ITEM_HEIGHT,
+  MAX_ITEM_WIDTH,
+  MAX_ITEM_HEIGHT,
+} from '../constants';
 
 /** Board metadata returned by GET /boards (no items). */
 export interface BoardSummary {
@@ -206,18 +214,24 @@ export const useBoardModuleStore = create<BoardModuleState>()((set, get) => ({
     const { activeBoardId, activeBoard } = get();
     if (!activeBoardId || !activeBoard) return;
 
-    // Round to integers (backend requires int)
-    const intPosition = { x: Math.round(position.x), y: Math.round(position.y) };
+    const item = activeBoard.items.find((i) => i.id === id);
+    if (!item) return;
+
+    // Round to integers and clamp within canvas bounds
+    const clampedPosition = {
+      x: Math.max(0, Math.min(Math.round(position.x), CANVAS_WIDTH - item.size.width)),
+      y: Math.max(0, Math.min(Math.round(position.y), CANVAS_HEIGHT - item.size.height)),
+    };
 
     // Optimistic update
     const previousItems = activeBoard.items;
-    const updatedItems = activeBoard.items.map((item) =>
-      item.id === id ? { ...item, position: intPosition } : item
+    const updatedItems = activeBoard.items.map((i) =>
+      i.id === id ? { ...i, position: clampedPosition } : i
     );
     set({ activeBoard: { ...activeBoard, items: updatedItems } });
 
     try {
-      await api.patch(`/boards/${activeBoardId}/items/${id}/position`, intPosition);
+      await api.patch(`/boards/${activeBoardId}/items/${id}/position`, clampedPosition);
     } catch (e: unknown) {
       // Revert on failure
       set({ activeBoard: { ...activeBoard, items: previousItems } });
@@ -230,18 +244,30 @@ export const useBoardModuleStore = create<BoardModuleState>()((set, get) => ({
     const { activeBoardId, activeBoard } = get();
     if (!activeBoardId || !activeBoard) return;
 
-    // Round to integers (backend requires int)
-    const intSize = { width: Math.round(size.width), height: Math.round(size.height) };
+    const item = activeBoard.items.find((i) => i.id === id);
+    if (!item) return;
+
+    // Clamp size within allowed bounds
+    const clampedSize = {
+      width: Math.max(MIN_ITEM_WIDTH, Math.min(Math.round(size.width), MAX_ITEM_WIDTH)),
+      height: Math.max(MIN_ITEM_HEIGHT, Math.min(Math.round(size.height), MAX_ITEM_HEIGHT)),
+    };
+
+    // Re-clamp position after resize to keep item within canvas
+    const clampedPosition = {
+      x: Math.max(0, Math.min(item.position.x, CANVAS_WIDTH - clampedSize.width)),
+      y: Math.max(0, Math.min(item.position.y, CANVAS_HEIGHT - clampedSize.height)),
+    };
 
     // Optimistic update
     const previousItems = activeBoard.items;
-    const updatedItems = activeBoard.items.map((item) =>
-      item.id === id ? { ...item, size: intSize } : item
+    const updatedItems = activeBoard.items.map((i) =>
+      i.id === id ? { ...i, size: clampedSize, position: clampedPosition } : i
     );
     set({ activeBoard: { ...activeBoard, items: updatedItems } });
 
     try {
-      await api.patch(`/boards/${activeBoardId}/items/${id}/size`, intSize);
+      await api.patch(`/boards/${activeBoardId}/items/${id}/size`, clampedSize);
     } catch (e: unknown) {
       // Revert on failure
       set({ activeBoard: { ...activeBoard, items: previousItems } });

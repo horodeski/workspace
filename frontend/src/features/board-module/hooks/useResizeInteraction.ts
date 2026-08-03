@@ -163,12 +163,14 @@ export function useResizeInteraction(
     if (!isResizingRef.current) {
       setCurrentSize(initialSize);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialSize.width, initialSize.height]);
 
   useEffect(() => {
     if (!isResizingRef.current) {
       setCurrentPosition(initialPosition);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialPosition.x, initialPosition.y]);
 
   // Keep latest callback/value refs to avoid stale closures
@@ -186,7 +188,7 @@ export function useResizeInteraction(
   const startSizeRef = useRef({ width: 0, height: 0 });
   const startPositionRef = useRef({ x: 0, y: 0 });
   const activeHandleRef = useRef<HandlePosition | null>(null);
-  const targetElementRef = useRef<Element | null>(null);
+  const targetElementRef = useRef<HTMLElement | null>(null);
   const pointerIdRef = useRef<number | null>(null);
 
   // Stable event handlers using refs — never recreated
@@ -270,7 +272,7 @@ export function useResizeInteraction(
       e.stopPropagation();
 
       // Set pointer capture on the target element
-      const target = e.currentTarget as Element;
+      const target = e.currentTarget as HTMLElement;
       target.setPointerCapture(e.pointerId);
 
       // Store initial state from the current DOM element's parent card

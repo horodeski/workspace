@@ -54,6 +54,7 @@ interface CalendarActions {
   navigateBack: () => void;
   // Activity actions (async, API-backed)
   fetchActivitiesForDate: (date: Date) => Promise<void>;
+  fetchActivitiesForMonth: (month: Date) => Promise<void>;
   addActivity: (data: ActivityFormData) => Promise<void>;
   updateActivity: (id: string, data: Partial<Activity>) => Promise<void>;
   toggleActivity: (id: string) => Promise<void>;
@@ -280,7 +281,7 @@ export const useCalendarStore = create<CalendarState & CalendarActions>(
         await api.post('/activities', data);
         const { selectedDate } = get();
         await get().fetchActivitiesForDate(selectedDate);
-        await (get() as any).fetchActivitiesForMonth(selectedDate);
+        await get().fetchActivitiesForMonth(selectedDate);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to add activity';
         set({ error: message, isLoading: false });
@@ -293,7 +294,7 @@ export const useCalendarStore = create<CalendarState & CalendarActions>(
         await api.put(`/activities/${id}`, data);
         const { selectedDate } = get();
         await get().fetchActivitiesForDate(selectedDate);
-        await (get() as any).fetchActivitiesForMonth(selectedDate);
+        await get().fetchActivitiesForMonth(selectedDate);
         // Update selectedActivity if it's the one being edited
         const { selectedActivity, activities } = get();
         if (selectedActivity?.id === id) {
@@ -313,7 +314,7 @@ export const useCalendarStore = create<CalendarState & CalendarActions>(
       try {
         await api.patch(`/activities/${id}/toggle`, { date: dateStr });
         await get().fetchActivitiesForDate(selectedDate);
-        await (get() as any).fetchActivitiesForMonth(selectedDate);
+        await get().fetchActivitiesForMonth(selectedDate);
         // Update selectedActivity if it's the one being toggled
         const { selectedActivity, activities } = get();
         if (selectedActivity?.id === id) {
@@ -332,7 +333,7 @@ export const useCalendarStore = create<CalendarState & CalendarActions>(
         await api.del(`/activities/${id}`);
         const { selectedDate, selectedActivity } = get();
         await get().fetchActivitiesForDate(selectedDate);
-        await (get() as any).fetchActivitiesForMonth(selectedDate);
+        await get().fetchActivitiesForMonth(selectedDate);
         if (selectedActivity?.id === id) {
           set({ selectedActivity: null, isActivityDetailOpen: false });
         }

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, Controller, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { startOfISOWeek, addDays } from 'date-fns';
 
@@ -105,7 +105,7 @@ export const WeeklyReviewEditPage: React.FC = () => {
   }, [yearNum, weekNum, isValidParams, getReviewByWeek]);
 
   const form = useForm<ReviewFormData>({
-    resolver: zodResolver(reviewFormSchema),
+    resolver: zodResolver(reviewFormSchema) as Resolver<ReviewFormData>,
     defaultValues: {
       learning: '',
       decisions: '',

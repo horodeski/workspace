@@ -1,4 +1,3 @@
-import React from 'react';
 import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { HistoryList } from '../components/HistoryList';
@@ -7,7 +6,7 @@ import type { WeekHistoryItem } from '../types/review.types';
 function renderHistoryList(items: WeekHistoryItem[]) {
   return render(
     <MemoryRouter>
-      <HistoryList items={items} />
+      <HistoryList items={items} currentWeek={31} currentYear={2025} />
     </MemoryRouter>
   );
 }

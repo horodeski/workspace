@@ -1,9 +1,78 @@
-import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { WeeklyReviewEditPage } from '../pages/WeeklyReviewEditPage';
 import { useReviewStore } from '../hooks/useReviewStore';
 import type { Review } from '../types/review.types';
+
+// Mock the api module so async store methods resolve with store state
+jest.mock('@/lib/api', () => ({
+  ApiError: class ApiError extends Error {
+    status: number;
+    body?: unknown;
+    constructor(status: number, message: string, body?: unknown) {
+      super(message);
+      this.name = 'ApiError';
+      this.status = status;
+      this.body = body;
+    }
+  },
+  api: {
+    get: jest.fn(async (url: string) => {
+      // GET /reviews/:year/:weekNumber
+      const match = url.match(/\/reviews\/(\d+)\/(\d+)/);
+      if (match) {
+        const year = parseInt(match[1]);
+        const weekNumber = parseInt(match[2]);
+        const review = useReviewStore.getState().reviews.find(
+          (r) => r.year === year && r.weekNumber === weekNumber
+        );
+        if (!review) {
+          const { ApiError: AE } = jest.requireMock('@/lib/api');
+          throw new AE(404, 'Not found');
+        }
+        return review;
+      }
+      return null;
+    }),
+    post: jest.fn(async (url: string, body?: unknown) => {
+      const data = body as Record<string, unknown> | undefined;
+      const now = new Date().toISOString();
+      if (url === '/reviews') {
+        const newReview = {
+          id: crypto.randomUUID(),
+          weekNumber: data?.weekNumber,
+          year: data?.year,
+          startDate: data?.startDate,
+          endDate: data?.endDate,
+          learning: data?.learning,
+          decisions: data?.decisions,
+          resolvedProblems: data?.resolvedProblems,
+          timeWaste: data?.timeWaste,
+          nextWeekFocus: data?.nextWeekFocus,
+          createdAt: now,
+          updatedAt: now,
+          isLocked: true,
+        };
+        return newReview;
+      }
+      // POST /reviews/:id/unlock
+      if (url.match(/\/reviews\/[^/]+\/unlock/)) {
+        const id = url.split('/')[2];
+        const review = useReviewStore.getState().reviews.find((r) => r.id === id);
+        return { ...review, isLocked: false, updatedAt: now };
+      }
+      return {};
+    }),
+    put: jest.fn(async (url: string, body?: unknown) => {
+      const data = body as Record<string, unknown>;
+      const id = url.split('/').pop()!;
+      const review = useReviewStore.getState().reviews.find((r) => r.id === id);
+      return { ...review, ...data, updatedAt: new Date().toISOString(), isLocked: true };
+    }),
+    patch: jest.fn(),
+    del: jest.fn(),
+  },
+}));
 
 // Mock useBlocker since it requires full data router context
 const mockNavigate = jest.fn();
@@ -103,31 +172,41 @@ describe('WeeklyReviewEditPage', () => {
     it('does not render toolbar when locked', async () => {
       renderEditPage('/weekly-review/2025/31');
       await waitFor(() => {
-        expect(screen.queryByLabelText('Negrito')).not.toBeInTheDocument();
+        expect(screen.getByText('Concluída.')).toBeInTheDocument();
+      });
+      expect(screen.queryByLabelText('Negrito')).not.toBeInTheDocument();
+    });
+
+    it('renders "Concluída." text in the locked banner', async () => {
+      renderEditPage('/weekly-review/2025/31');
+      await waitFor(() => {
+        expect(screen.getByText('Concluída.')).toBeInTheDocument();
       });
     });
 
-    it('renders "Concluída." text in the locked banner', () => {
+    it('renders the locked banner explanatory message', async () => {
       renderEditPage('/weekly-review/2025/31');
-      expect(screen.getByText('Concluída.')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(
+          screen.getByText('Esta revisão representa sua percepção naquele momento.')
+        ).toBeInTheDocument();
+      });
     });
 
-    it('renders the locked banner explanatory message', () => {
+    it('renders "Desbloquear edição" button', async () => {
       renderEditPage('/weekly-review/2025/31');
-      expect(
-        screen.getByText('Esta revisão representa sua percepção naquele momento.')
-      ).toBeInTheDocument();
+      await waitFor(() => {
+        expect(
+          screen.getByRole('button', { name: 'Desbloquear edição' })
+        ).toBeInTheDocument();
+      });
     });
 
-    it('renders "Desbloquear edição" button', () => {
+    it('does NOT render "Salvar revisão" button when locked', async () => {
       renderEditPage('/weekly-review/2025/31');
-      expect(
-        screen.getByRole('button', { name: 'Desbloquear edição' })
-      ).toBeInTheDocument();
-    });
-
-    it('does NOT render "Salvar revisão" button when locked', () => {
-      renderEditPage('/weekly-review/2025/31');
+      await waitFor(() => {
+        expect(screen.getByText('Concluída.')).toBeInTheDocument();
+      });
       expect(
         screen.queryByRole('button', { name: 'Salvar revisão' })
       ).not.toBeInTheDocument();
@@ -141,6 +220,11 @@ describe('WeeklyReviewEditPage', () => {
 
     it('shows toolbar after clicking "Desbloquear edição"', async () => {
       renderEditPage('/weekly-review/2025/31');
+
+      // Wait for locked state to render
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Desbloquear edição' })).toBeInTheDocument();
+      });
 
       // Verify no toolbar when locked
       expect(screen.queryByLabelText('Negrito')).not.toBeInTheDocument();
@@ -158,6 +242,11 @@ describe('WeeklyReviewEditPage', () => {
 
     it('shows "Salvar revisão" button after unlocking', async () => {
       renderEditPage('/weekly-review/2025/31');
+
+      // Wait for locked state
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Desbloquear edição' })).toBeInTheDocument();
+      });
 
       fireEvent.click(
         screen.getByRole('button', { name: 'Desbloquear edição' })
@@ -228,8 +317,11 @@ describe('WeeklyReviewEditPage', () => {
       });
 
       // The review should NOT be saved to the store
-      const savedReview = useReviewStore.getState().getReviewByWeek(2025, 31);
-      expect(savedReview).toBeUndefined();
+      let savedReview: unknown;
+      await act(async () => {
+        savedReview = await useReviewStore.getState().getReviewByWeek(2025, 31);
+      });
+      expect(savedReview).toBeNull();
 
       // The page should remain in editable state (not transition to locked)
       expect(

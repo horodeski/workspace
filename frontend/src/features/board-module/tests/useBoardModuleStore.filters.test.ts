@@ -1,8 +1,99 @@
-import { useBoardModuleStore } from '../hooks/useBoardModuleStore';
+import { DEFAULT_BOARD_NAME } from '../constants';
 
-// Reset store state before each test
+interface MockBoard {
+  id: string;
+  name: string;
+  items: never[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+let mockBoards: MockBoard[] = [];
+
+function resetMockDb() {
+  const now = new Date().toISOString();
+  mockBoards = [
+    {
+      id: crypto.randomUUID(),
+      name: DEFAULT_BOARD_NAME,
+      items: [],
+      createdAt: now,
+      updatedAt: now,
+    },
+  ];
+}
+
+jest.mock('@/lib/api', () => ({
+  api: {
+    get: jest.fn(),
+    post: jest.fn(),
+    put: jest.fn(),
+    patch: jest.fn(),
+    del: jest.fn(),
+  },
+  ApiError: class ApiError extends Error {
+    status: number;
+    constructor(status: number, message: string) {
+      super(message);
+      this.status = status;
+    }
+  },
+}));
+
+import { useBoardModuleStore } from '../hooks/useBoardModuleStore';
+import { api } from '@/lib/api';
+
+const mockedApi = api as jest.Mocked<typeof api>;
+
+function setupApiMocks() {
+  mockedApi.get.mockImplementation(async (url: string) => {
+    if (url === '/boards') {
+      return mockBoards.map(({ items: _items, ...rest }) => rest);
+    }
+    const boardMatch = url.match(/^\/boards\/([^/]+)$/);
+    if (boardMatch) {
+      const board = mockBoards.find((b) => b.id === boardMatch[1]);
+      if (!board) throw new Error('Board not found');
+      return { ...board };
+    }
+    return null;
+  });
+
+  mockedApi.post.mockImplementation(async (url: string, body?: unknown) => {
+    const data = body as Record<string, unknown> | undefined;
+    if (url === '/boards') {
+      const now = new Date().toISOString();
+      const newBoard: MockBoard = {
+        id: crypto.randomUUID(),
+        name: data?.name as string,
+        items: [],
+        createdAt: now,
+        updatedAt: now,
+      };
+      mockBoards.push(newBoard);
+      return { id: newBoard.id, name: newBoard.name, createdAt: newBoard.createdAt, updatedAt: newBoard.updatedAt };
+    }
+    return {};
+  });
+
+  mockedApi.put.mockImplementation(async () => ({}));
+  mockedApi.patch.mockImplementation(async () => ({}));
+  mockedApi.del.mockImplementation(async () => undefined);
+}
+
+// Reset store and mock DB before each test
 beforeEach(() => {
-  useBoardModuleStore.setState(useBoardModuleStore.getInitialState());
+  resetMockDb();
+  setupApiMocks();
+  const board = mockBoards[0];
+  useBoardModuleStore.setState({
+    boards: [{ id: board.id, name: board.name, createdAt: board.createdAt, updatedAt: board.updatedAt }],
+    activeBoard: { ...board },
+    activeBoardId: board.id,
+    filters: {},
+    isLoading: false,
+    error: null,
+  });
 });
 
 describe('useBoardModuleStore - Filters', () => {
@@ -53,9 +144,8 @@ describe('useBoardModuleStore - Filters', () => {
   });
 
   describe('filter independence per board', () => {
-    it('preserves filters independently for each board', () => {
-      const { createBoard } = useBoardModuleStore.getState();
-      createBoard('Second Board');
+    it('preserves filters independently for each board', async () => {
+      await useBoardModuleStore.getState().createBoard('Second Board');
 
       const { boards, setFilter } = useBoardModuleStore.getState();
       const firstBoardId = boards[0].id;
@@ -78,9 +168,8 @@ describe('useBoardModuleStore - Filters', () => {
       expect(useBoardModuleStore.getState().getActiveFilter()).toBe('quote');
     });
 
-    it('returns "all" for a board that has no filter set', () => {
-      const { createBoard } = useBoardModuleStore.getState();
-      createBoard('Second Board');
+    it('returns "all" for a board that has no filter set', async () => {
+      await useBoardModuleStore.getState().createBoard('Second Board');
 
       const { boards, setFilter } = useBoardModuleStore.getState();
       const firstBoardId = boards[0].id;

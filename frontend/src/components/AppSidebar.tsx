@@ -2,10 +2,7 @@ import { NavLink } from 'react-router-dom';
 import {
   Calendar,
   ListChecks,
-  Inbox,
   BookOpen,
-  BarChart3,
-  Settings,
   Lightbulb,
   type LucideIcon,
 } from 'lucide-react';

@@ -27,7 +27,7 @@ export function useDragInteraction(
   // Use refs for all mutable state that event listeners need access to
   const startPointerRef = useRef({ x: 0, y: 0 });
   const startPositionRef = useRef(initialPosition);
-  const elementRef = useRef<Element | null>(null);
+  const elementRef = useRef<HTMLElement | null>(null);
   const isDraggingRef = useRef(false);
 
   // Keep latest callback refs to avoid stale closures in DOM event listeners
@@ -90,7 +90,7 @@ export function useDragInteraction(
 
       if (elementRef.current) {
         try {
-          (elementRef.current as HTMLElement).releasePointerCapture(e.pointerId);
+          elementRef.current.releasePointerCapture(e.pointerId);
         } catch {
           // Already released
         }
@@ -129,7 +129,7 @@ export function useDragInteraction(
       e.preventDefault();
       e.stopPropagation();
 
-      const element = e.currentTarget;
+      const element = e.currentTarget as HTMLElement;
       elementRef.current = element;
 
       // Record start positions using the latest current position from ref

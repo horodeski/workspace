@@ -1,6 +1,100 @@
 import * as fc from 'fast-check';
 import { useReviewStore } from '../hooks/useReviewStore';
 
+// Mock the api module so async store methods resolve immediately
+jest.mock('@/lib/api', () => ({
+  ApiError: class ApiError extends Error {
+    status: number;
+    body?: unknown;
+    constructor(status: number, message: string, body?: unknown) {
+      super(message);
+      this.name = 'ApiError';
+      this.status = status;
+      this.body = body;
+    }
+  },
+  api: {
+    get: jest.fn(),
+    post: jest.fn(),
+    put: jest.fn(),
+    patch: jest.fn(),
+    del: jest.fn(),
+  },
+}));
+
+// Import the mocked api so we can control return values
+import { api } from '@/lib/api';
+const mockedApi = api as jest.Mocked<typeof api>;
+
+/**
+ * Helper: configure mocks so that saveReview (post/put) and unlockReview (post)
+ * return properly shaped Review objects, simulating the backend.
+ */
+function setupApiMocks() {
+  // POST /reviews — create a new review
+  mockedApi.post.mockImplementation(async (url: string, body?: unknown) => {
+    const data = body as Record<string, unknown>;
+    const now = new Date().toISOString();
+    if (url === '/reviews') {
+      return {
+        id: crypto.randomUUID(),
+        weekNumber: data.weekNumber,
+        year: data.year,
+        startDate: data.startDate,
+        endDate: data.endDate,
+        learning: data.learning,
+        decisions: data.decisions,
+        resolvedProblems: data.resolvedProblems,
+        timeWaste: data.timeWaste,
+        nextWeekFocus: data.nextWeekFocus,
+        createdAt: now,
+        updatedAt: now,
+        isLocked: true,
+      };
+    }
+    // POST /reviews/:id/unlock
+    if (url.match(/\/reviews\/[^/]+\/unlock/)) {
+      const id = url.split('/')[2];
+      const review = useReviewStore.getState().reviews.find((r) => r.id === id);
+      return {
+        ...review,
+        isLocked: false,
+        updatedAt: now,
+      };
+    }
+    return {};
+  });
+
+  // PUT /reviews/:id — update existing review
+  mockedApi.put.mockImplementation(async (url: string, body?: unknown) => {
+    const data = body as Record<string, unknown>;
+    const id = url.split('/').pop()!;
+    const review = useReviewStore.getState().reviews.find((r) => r.id === id);
+    const now = new Date().toISOString();
+    return {
+      ...review,
+      ...data,
+      updatedAt: now,
+      isLocked: true,
+    };
+  });
+
+  // GET /reviews/:year/:weekNumber
+  mockedApi.get.mockImplementation(async (url: string) => {
+    const parts = url.split('/');
+    const year = parseInt(parts[2]);
+    const weekNumber = parseInt(parts[3]);
+    const review = useReviewStore.getState().reviews.find(
+      (r) => r.year === year && r.weekNumber === weekNumber
+    );
+    if (!review) {
+      const { ApiError } = jest.requireMock('@/lib/api');
+      throw new ApiError(404, 'Not found');
+    }
+    return review;
+  });
+}
+
 /**
  * Property 6: Lock/Unlock State Transitions
  *
@@ -13,6 +107,8 @@ import { useReviewStore } from '../hooks/useReviewStore';
 describe('Feature: weekly-review, Property 6: Lock/unlock state transitions', () => {
   beforeEach(() => {
     useReviewStore.setState({ reviews: [] });
+    jest.clearAllMocks();
+    setupApiMocks();
   });
 
   // Arbitrary for valid review form data (at least one non-whitespace field, all ≤ 500 chars)
@@ -26,20 +122,20 @@ describe('Feature: weekly-review, Property 6: Lock/unlock state transitions', ()
 
   const weekNumberArb = fc.integer({ min: 1, max: 53 });
   const yearArb = fc.integer({ min: 2020, max: 2030 });
-  const dateStringArb = fc.constant('2025-01-06'); // valid ISO date string
+  const dateStringArb = fc.constant('2025-01-06');
 
-  it('saveReview always results in isLocked === true', () => {
-    fc.assert(
-      fc.property(
+  it('saveReview always results in isLocked === true', async () => {
+    await fc.assert(
+      fc.asyncProperty(
         reviewFormDataArb,
         weekNumberArb,
         yearArb,
         dateStringArb,
         dateStringArb,
-        (formData, weekNumber, year, startDate, endDate) => {
+        async (formData, weekNumber, year, startDate, endDate) => {
           useReviewStore.setState({ reviews: [] });
 
-          useReviewStore.getState().saveReview({
+          await useReviewStore.getState().saveReview({
             ...formData,
             weekNumber,
             year,
@@ -47,7 +143,10 @@ describe('Feature: weekly-review, Property 6: Lock/unlock state transitions', ()
             endDate,
           });
 
-          const review = useReviewStore.getState().getReviewByWeek(year, weekNumber);
+          const reviews = useReviewStore.getState().reviews;
+          const review = reviews.find(
+            (r) => r.weekNumber === weekNumber && r.year === year
+          );
           expect(review).toBeDefined();
           expect(review!.isLocked).toBe(true);
         }
@@ -56,19 +155,19 @@ describe('Feature: weekly-review, Property 6: Lock/unlock state transitions', ()
     );
   });
 
-  it('unlockReview always results in isLocked === false', () => {
-    fc.assert(
-      fc.property(
+  it('unlockReview always results in isLocked === false', async () => {
+    await fc.assert(
+      fc.asyncProperty(
         reviewFormDataArb,
         weekNumberArb,
         yearArb,
         dateStringArb,
         dateStringArb,
-        (formData, weekNumber, year, startDate, endDate) => {
+        async (formData, weekNumber, year, startDate, endDate) => {
           useReviewStore.setState({ reviews: [] });
 
           // Save to create a locked review
-          useReviewStore.getState().saveReview({
+          await useReviewStore.getState().saveReview({
             ...formData,
             weekNumber,
             year,
@@ -76,35 +175,40 @@ describe('Feature: weekly-review, Property 6: Lock/unlock state transitions', ()
             endDate,
           });
 
-          const review = useReviewStore.getState().getReviewByWeek(year, weekNumber);
+          const reviews = useReviewStore.getState().reviews;
+          const review = reviews.find(
+            (r) => r.weekNumber === weekNumber && r.year === year
+          );
           expect(review).toBeDefined();
           expect(review!.isLocked).toBe(true);
 
           // Unlock the review
-          useReviewStore.getState().unlockReview(review!.id);
+          await useReviewStore.getState().unlockReview(review!.id);
 
-          const unlocked = useReviewStore.getState().getReviewByWeek(year, weekNumber);
-          expect(unlocked).toBeDefined();
-          expect(unlocked!.isLocked).toBe(false);
+          const updated = useReviewStore.getState().reviews.find(
+            (r) => r.weekNumber === weekNumber && r.year === year
+          );
+          expect(updated).toBeDefined();
+          expect(updated!.isLocked).toBe(false);
         }
       ),
       { numRuns: 100 }
     );
   });
 
-  it('re-saving after unlock results in isLocked === true again', () => {
-    fc.assert(
-      fc.property(
+  it('re-saving after unlock results in isLocked === true again', async () => {
+    await fc.assert(
+      fc.asyncProperty(
         reviewFormDataArb,
         weekNumberArb,
         yearArb,
         dateStringArb,
         dateStringArb,
-        (formData, weekNumber, year, startDate, endDate) => {
+        async (formData, weekNumber, year, startDate, endDate) => {
           useReviewStore.setState({ reviews: [] });
 
           // Step 1: Save → locked
-          useReviewStore.getState().saveReview({
+          await useReviewStore.getState().saveReview({
             ...formData,
             weekNumber,
             year,
@@ -112,19 +216,23 @@ describe('Feature: weekly-review, Property 6: Lock/unlock state transitions', ()
             endDate,
           });
 
-          const saved = useReviewStore.getState().getReviewByWeek(year, weekNumber);
+          const saved = useReviewStore.getState().reviews.find(
+            (r) => r.weekNumber === weekNumber && r.year === year
+          );
           expect(saved).toBeDefined();
           expect(saved!.isLocked).toBe(true);
 
           // Step 2: Unlock → unlocked
-          useReviewStore.getState().unlockReview(saved!.id);
+          await useReviewStore.getState().unlockReview(saved!.id);
 
-          const unlocked = useReviewStore.getState().getReviewByWeek(year, weekNumber);
+          const unlocked = useReviewStore.getState().reviews.find(
+            (r) => r.weekNumber === weekNumber && r.year === year
+          );
           expect(unlocked).toBeDefined();
           expect(unlocked!.isLocked).toBe(false);
 
           // Step 3: Re-save → locked again
-          useReviewStore.getState().saveReview({
+          await useReviewStore.getState().saveReview({
             ...formData,
             weekNumber,
             year,
@@ -132,7 +240,9 @@ describe('Feature: weekly-review, Property 6: Lock/unlock state transitions', ()
             endDate,
           });
 
-          const reSaved = useReviewStore.getState().getReviewByWeek(year, weekNumber);
+          const reSaved = useReviewStore.getState().reviews.find(
+            (r) => r.weekNumber === weekNumber && r.year === year
+          );
           expect(reSaved).toBeDefined();
           expect(reSaved!.isLocked).toBe(true);
         }
@@ -155,12 +265,14 @@ describe('Feature: weekly-review, Property 6: Lock/unlock state transitions', ()
  */
 describe('Feature: weekly-review, Property 2: History ordering and capping', () => {
   beforeEach(() => {
-    useReviewStore.setState({ reviews: [] });
+    useReviewStore.setState({ reviews: [], recentWeeks: [] });
+    jest.clearAllMocks();
+    setupApiMocks();
   });
 
-  it('getRecentWeeks() with default count returns at most 12 items', () => {
-    fc.assert(
-      fc.property(
+  it('getRecentWeeks() returns at most 12 items', async () => {
+    await fc.assert(
+      fc.asyncProperty(
         fc.array(
           fc.record({
             weekNumber: fc.integer({ min: 1, max: 53 }),
@@ -168,12 +280,12 @@ describe('Feature: weekly-review, Property 2: History ordering and capping', () 
           }),
           { minLength: 0, maxLength: 30 }
         ),
-        (reviewSpecs) => {
-          // Seed the store with reviews for various weeks
-          useReviewStore.setState({ reviews: [] });
-          const { saveReview } = useReviewStore.getState();
+        async (reviewSpecs) => {
+          useReviewStore.setState({ reviews: [], recentWeeks: [] });
+
+          // Save reviews to build state
           for (const spec of reviewSpecs) {
-            saveReview({
+            await useReviewStore.getState().saveReview({
               weekNumber: spec.weekNumber,
               year: spec.year,
               startDate: '2025-01-01',
@@ -185,6 +297,22 @@ describe('Feature: weekly-review, Property 2: History ordering and capping', () 
               nextWeekFocus: '',
             });
           }
+
+          // Build history items from saved reviews (deduplicated)
+          const reviews = useReviewStore.getState().reviews;
+          const historyItems: Array<{ weekNumber: number; year: number; hasReview: boolean; isLocked: boolean }> = reviews
+            .map((r) => ({
+              weekNumber: r.weekNumber,
+              year: r.year,
+              hasReview: true,
+              isLocked: r.isLocked,
+            }))
+            .sort((a, b) => b.year - a.year || b.weekNumber - a.weekNumber)
+            .slice(0, 12);
+
+          // Mock fetchRecentWeeks to set the recentWeeks from reviews
+          mockedApi.get.mockImplementationOnce(async () => historyItems);
+          await useReviewStore.getState().fetchRecentWeeks();
 
           const result = useReviewStore.getState().getRecentWeeks();
           expect(result.length).toBeLessThanOrEqual(12);
@@ -194,9 +322,9 @@ describe('Feature: weekly-review, Property 2: History ordering and capping', () 
     );
   });
 
-  it('getRecentWeeks(count) returns at most count items for random count 1–20', () => {
-    fc.assert(
-      fc.property(
+  it('getRecentWeeks(count) returns at most count items for random count 1–20', async () => {
+    await fc.assert(
+      fc.asyncProperty(
         fc.integer({ min: 1, max: 20 }),
         fc.array(
           fc.record({
@@ -205,11 +333,11 @@ describe('Feature: weekly-review, Property 2: History ordering and capping', () 
           }),
           { minLength: 0, maxLength: 30 }
         ),
-        (count, reviewSpecs) => {
-          useReviewStore.setState({ reviews: [] });
-          const { saveReview } = useReviewStore.getState();
+        async (count, reviewSpecs) => {
+          useReviewStore.setState({ reviews: [], recentWeeks: [] });
+
           for (const spec of reviewSpecs) {
-            saveReview({
+            await useReviewStore.getState().saveReview({
               weekNumber: spec.weekNumber,
               year: spec.year,
               startDate: '2025-01-01',
@@ -222,7 +350,21 @@ describe('Feature: weekly-review, Property 2: History ordering and capping', () 
             });
           }
 
-          const result = useReviewStore.getState().getRecentWeeks(count);
+          const reviews = useReviewStore.getState().reviews;
+          const historyItems = reviews
+            .map((r) => ({
+              weekNumber: r.weekNumber,
+              year: r.year,
+              hasReview: true,
+              isLocked: r.isLocked,
+            }))
+            .sort((a, b) => b.year - a.year || b.weekNumber - a.weekNumber)
+            .slice(0, count);
+
+          mockedApi.get.mockImplementationOnce(async () => historyItems);
+          await useReviewStore.getState().fetchRecentWeeks(count);
+
+          const result = useReviewStore.getState().getRecentWeeks();
           expect(result.length).toBeLessThanOrEqual(count);
         }
       ),
@@ -230,22 +372,22 @@ describe('Feature: weekly-review, Property 2: History ordering and capping', () 
     );
   });
 
-  it('items are in strict reverse chronological order', () => {
-    fc.assert(
-      fc.property(
+  it('items are in strict reverse chronological order', async () => {
+    await fc.assert(
+      fc.asyncProperty(
         fc.integer({ min: 1, max: 20 }),
         fc.array(
           fc.record({
             weekNumber: fc.integer({ min: 1, max: 53 }),
             year: fc.integer({ min: 2020, max: 2030 }),
           }),
-          { minLength: 0, maxLength: 30 }
+          { minLength: 2, maxLength: 30 }
         ),
-        (count, reviewSpecs) => {
-          useReviewStore.setState({ reviews: [] });
-          const { saveReview } = useReviewStore.getState();
+        async (count, reviewSpecs) => {
+          useReviewStore.setState({ reviews: [], recentWeeks: [] });
+
           for (const spec of reviewSpecs) {
-            saveReview({
+            await useReviewStore.getState().saveReview({
               weekNumber: spec.weekNumber,
               year: spec.year,
               startDate: '2025-01-01',
@@ -258,7 +400,21 @@ describe('Feature: weekly-review, Property 2: History ordering and capping', () 
             });
           }
 
-          const result = useReviewStore.getState().getRecentWeeks(count);
+          const reviews = useReviewStore.getState().reviews;
+          const historyItems = reviews
+            .map((r) => ({
+              weekNumber: r.weekNumber,
+              year: r.year,
+              hasReview: true,
+              isLocked: r.isLocked,
+            }))
+            .sort((a, b) => b.year - a.year || b.weekNumber - a.weekNumber)
+            .slice(0, count);
+
+          mockedApi.get.mockImplementationOnce(async () => historyItems);
+          await useReviewStore.getState().fetchRecentWeeks(count);
+
+          const result = useReviewStore.getState().getRecentWeeks();
 
           // Verify strict reverse chronological order
           for (let i = 0; i < result.length - 1; i++) {
@@ -275,9 +431,9 @@ describe('Feature: weekly-review, Property 2: History ordering and capping', () 
     );
   });
 
-  it('hasReview and isLocked correctly reflect saved reviews', () => {
-    fc.assert(
-      fc.property(
+  it('hasReview and isLocked correctly reflect saved reviews', async () => {
+    await fc.assert(
+      fc.asyncProperty(
         fc.array(
           fc.record({
             weekNumber: fc.integer({ min: 1, max: 53 }),
@@ -285,13 +441,11 @@ describe('Feature: weekly-review, Property 2: History ordering and capping', () 
           }),
           { minLength: 1, maxLength: 20 }
         ),
-        (reviewSpecs) => {
-          useReviewStore.setState({ reviews: [] });
-          const { saveReview } = useReviewStore.getState();
+        async (reviewSpecs) => {
+          useReviewStore.setState({ reviews: [], recentWeeks: [] });
 
-          // Save reviews (these become locked after save)
           for (const spec of reviewSpecs) {
-            saveReview({
+            await useReviewStore.getState().saveReview({
               weekNumber: spec.weekNumber,
               year: spec.year,
               startDate: '2025-01-01',
@@ -304,18 +458,21 @@ describe('Feature: weekly-review, Property 2: History ordering and capping', () 
             });
           }
 
-          const result = useReviewStore.getState().getRecentWeeks();
           const reviews = useReviewStore.getState().reviews;
+          const historyItems = reviews
+            .map((r) => ({
+              weekNumber: r.weekNumber,
+              year: r.year,
+              hasReview: true,
+              isLocked: r.isLocked,
+            }))
+            .sort((a, b) => b.year - a.year || b.weekNumber - a.weekNumber)
+            .slice(0, 12);
 
-          // Verify ordering still holds
-          for (let i = 0; i < result.length - 1; i++) {
-            const current = result[i];
-            const next = result[i + 1];
-            const isStrictlyBefore =
-              current.year > next.year ||
-              (current.year === next.year && current.weekNumber > next.weekNumber);
-            expect(isStrictlyBefore).toBe(true);
-          }
+          mockedApi.get.mockImplementationOnce(async () => historyItems);
+          await useReviewStore.getState().fetchRecentWeeks();
+
+          const result = useReviewStore.getState().getRecentWeeks();
 
           // Verify hasReview and isLocked reflect actual store data
           for (const item of result) {
@@ -351,9 +508,11 @@ describe('Feature: weekly-review, Property 2: History ordering and capping', () 
 describe('Feature: weekly-review, Property 5: Upsert idempotence', () => {
   beforeEach(() => {
     useReviewStore.setState({ reviews: [] });
+    jest.clearAllMocks();
+    setupApiMocks();
   });
 
-  it('saving same weekNumber/year N times results in exactly one review with original createdAt and updated updatedAt', () => {
+  it('saving same weekNumber/year N times results in exactly one review with original createdAt and updated updatedAt', async () => {
     const validFieldArb = fc
       .string({ minLength: 1, maxLength: 500 })
       .filter((s) => s.trim().length > 0);
@@ -366,12 +525,12 @@ describe('Feature: weekly-review, Property 5: Upsert idempotence', () => {
       nextWeekFocus: validFieldArb,
     });
 
-    fc.assert(
-      fc.property(
+    await fc.assert(
+      fc.asyncProperty(
         fc.integer({ min: 1, max: 53 }), // weekNumber
         fc.integer({ min: 2000, max: 2099 }), // year
         fc.array(formDataArb, { minLength: 2, maxLength: 10 }), // N saves
-        (weekNumber, year, formDataList) => {
+        async (weekNumber, year, formDataList) => {
           // Reset store before each property run
           useReviewStore.setState({ reviews: [] });
 
@@ -379,7 +538,7 @@ describe('Feature: weekly-review, Property 5: Upsert idempotence', () => {
           const endDate = `${year}-01-07`;
 
           // Perform first save
-          useReviewStore.getState().saveReview({
+          await useReviewStore.getState().saveReview({
             ...formDataList[0],
             weekNumber,
             year,
@@ -398,7 +557,7 @@ describe('Feature: weekly-review, Property 5: Upsert idempotence', () => {
 
           // Perform remaining saves
           for (let i = 1; i < formDataList.length; i++) {
-            useReviewStore.getState().saveReview({
+            await useReviewStore.getState().saveReview({
               ...formDataList[i],
               weekNumber,
               year,
@@ -469,14 +628,16 @@ describe('Feature: weekly-review, Property 4: Save metadata correctness', () => 
 
   beforeEach(() => {
     useReviewStore.setState({ reviews: [] });
+    jest.clearAllMocks();
+    setupApiMocks();
   });
 
-  it('id is a valid UUID v4', () => {
-    fc.assert(
-      fc.property(validFormDataArb, (formData) => {
+  it('id is a valid UUID v4', async () => {
+    await fc.assert(
+      fc.asyncProperty(validFormDataArb, async (formData) => {
         useReviewStore.setState({ reviews: [] });
 
-        useReviewStore.getState().saveReview(formData);
+        await useReviewStore.getState().saveReview(formData);
 
         const reviews = useReviewStore.getState().reviews;
         expect(reviews).toHaveLength(1);
@@ -486,12 +647,12 @@ describe('Feature: weekly-review, Property 4: Save metadata correctness', () => 
     );
   });
 
-  it('createdAt is a valid ISO 8601 datetime', () => {
-    fc.assert(
-      fc.property(validFormDataArb, (formData) => {
+  it('createdAt is a valid ISO 8601 datetime', async () => {
+    await fc.assert(
+      fc.asyncProperty(validFormDataArb, async (formData) => {
         useReviewStore.setState({ reviews: [] });
 
-        useReviewStore.getState().saveReview(formData);
+        await useReviewStore.getState().saveReview(formData);
 
         const reviews = useReviewStore.getState().reviews;
         expect(reviews).toHaveLength(1);
@@ -504,12 +665,12 @@ describe('Feature: weekly-review, Property 4: Save metadata correctness', () => 
     );
   });
 
-  it('updatedAt is a valid ISO 8601 datetime', () => {
-    fc.assert(
-      fc.property(validFormDataArb, (formData) => {
+  it('updatedAt is a valid ISO 8601 datetime', async () => {
+    await fc.assert(
+      fc.asyncProperty(validFormDataArb, async (formData) => {
         useReviewStore.setState({ reviews: [] });
 
-        useReviewStore.getState().saveReview(formData);
+        await useReviewStore.getState().saveReview(formData);
 
         const reviews = useReviewStore.getState().reviews;
         expect(reviews).toHaveLength(1);
@@ -522,12 +683,12 @@ describe('Feature: weekly-review, Property 4: Save metadata correctness', () => 
     );
   });
 
-  it('updatedAt >= createdAt', () => {
-    fc.assert(
-      fc.property(validFormDataArb, (formData) => {
+  it('updatedAt >= createdAt', async () => {
+    await fc.assert(
+      fc.asyncProperty(validFormDataArb, async (formData) => {
         useReviewStore.setState({ reviews: [] });
 
-        useReviewStore.getState().saveReview(formData);
+        await useReviewStore.getState().saveReview(formData);
 
         const reviews = useReviewStore.getState().reviews;
         expect(reviews).toHaveLength(1);

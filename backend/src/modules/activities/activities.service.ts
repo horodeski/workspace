@@ -2,6 +2,7 @@ import { activitiesRepository, type ActivityRecord } from './activities.reposito
 import { recurrenceService, type ExpandedActivity } from './recurrence.service.js';
 import { NotFoundError } from '../../shared/errors/index.js';
 import { eventBus } from '../../shared/event-bus/index.js';
+import { sanitizeHtml } from '../../shared/utils/sanitization.js';
 import type { CreateActivityInput, UpdateActivityInput } from './activities.schemas.js';
 
 export interface IActivitiesService {
@@ -16,7 +17,7 @@ export interface IActivitiesService {
 async function create(userId: string, data: CreateActivityInput): Promise<ActivityRecord> {
   const activity = await activitiesRepository.create(userId, {
     title: data.title,
-    description: data.description,
+    description: data.description ? sanitizeHtml(data.description) : data.description,
     date: data.date,
     startTime: data.startTime ?? null,
     duration: data.duration ?? null,
@@ -69,7 +70,12 @@ async function update(
   id: string,
   data: UpdateActivityInput
 ): Promise<ActivityRecord> {
-  const updated = await activitiesRepository.update(id, userId, data);
+  // Sanitize HTML in description if provided
+  const sanitizedData = data.description !== undefined
+    ? { ...data, description: sanitizeHtml(data.description) }
+    : data;
+
+  const updated = await activitiesRepository.update(id, userId, sanitizedData);
 
   if (!updated) {
     throw new NotFoundError('Atividade');

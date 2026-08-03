@@ -1,4 +1,4 @@
-import { Routine } from '../features/routine/types/routine.types';
+import type { SupportEntry } from '../features/routine/types/routine.types';
 
 export interface JiraTask {
   id: string;
@@ -9,5 +9,5 @@ export interface JiraTask {
 
 export interface JiraService {
   getMyTasks(): Promise<JiraTask[]>;
-  syncRoutines(routines: Routine[]): Promise<void>;
+  syncRoutines(routines: SupportEntry[]): Promise<void>;
 }
