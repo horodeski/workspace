@@ -1,386 +1,265 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
 
-import {
-  DEFAULT_BOARD_NAME,
-  STORAGE_KEY,
-  CANVAS_WIDTH,
-  CANVAS_HEIGHT,
-  DEFAULT_ITEM_WIDTH,
-  DEFAULT_ITEM_HEIGHT,
-  MIN_ITEM_WIDTH,
-  MIN_ITEM_HEIGHT,
-  MAX_ITEM_WIDTH,
-  MAX_ITEM_HEIGHT,
-} from '../constants';
-import type { Board, BoardFilter, BoardItem, BoardItemType, BoardItemPosition, BoardItemSize } from '../types/board.types';
-import { validateBoardName, validateItemContent } from './validation';
-import { migrateLegacyData } from './migration';
+import { api } from '@/lib/api';
+import type {
+  BoardFilter,
+  BoardItem,
+  BoardItemType,
+  BoardItemPosition,
+  BoardItemSize,
+} from '../types/board.types';
+
+/** Board metadata returned by GET /boards (no items). */
+export interface BoardSummary {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface BoardModuleState {
   // State
-  boards: Board[];
+  boards: BoardSummary[];
+  activeBoard: (BoardSummary & { items: BoardItem[] }) | null;
   activeBoardId: string | null;
   filters: Record<string, BoardFilter>;
+  isLoading: boolean;
+  error: string | null;
 
-  // Board CRUD
-  createBoard: (name: string) => { success: boolean; error?: string };
-  renameBoard: (id: string, newName: string) => { success: boolean; error?: string };
-  deleteBoard: (id: string) => void;
+  // Board actions
+  fetchBoards: () => Promise<void>;
+  fetchBoard: (id: string) => Promise<void>;
   setActiveBoard: (id: string) => void;
+  createBoard: (name: string) => Promise<{ success: boolean; error?: string }>;
+  renameBoard: (id: string, newName: string) => Promise<{ success: boolean; error?: string }>;
+  deleteBoard: (id: string) => Promise<void>;
 
-  // Item CRUD (stubs — implemented in Task 3.1)
-  addItem: (content: string, type: BoardItemType) => void;
-  updateItem: (id: string, content: string) => void;
-  removeItem: (id: string) => void;
-  updatePosition: (id: string, position: BoardItemPosition) => void;
-  updateSize: (id: string, size: BoardItemSize) => void;
+  // Item actions
+  addItem: (content: string, type: BoardItemType) => Promise<void>;
+  updateItem: (id: string, content: string) => Promise<void>;
+  removeItem: (id: string) => Promise<void>;
+  updatePosition: (id: string, position: BoardItemPosition) => Promise<void>;
+  updateSize: (id: string, size: BoardItemSize) => Promise<void>;
 
-  // Filters (stubs — implemented in Task 4.1)
+  // Filters (local only)
   setFilter: (boardId: string, filter: BoardFilter) => void;
   getActiveFilter: () => BoardFilter;
 }
 
-function createDefaultBoard(): Board {
-  return {
-    id: crypto.randomUUID(),
-    name: DEFAULT_BOARD_NAME,
-    items: [],
-    createdAt: new Date().toISOString(),
-  };
-}
+export const useBoardModuleStore = create<BoardModuleState>()((set, get) => ({
+  // Initial state
+  boards: [],
+  activeBoard: null,
+  activeBoardId: null,
+  filters: {},
+  isLoading: false,
+  error: null,
 
-function isValidBoard(board: unknown): board is Board {
-  if (typeof board !== 'object' || board === null) return false;
-  const b = board as Record<string, unknown>;
-  return (
-    typeof b.id === 'string' &&
-    typeof b.name === 'string' &&
-    Array.isArray(b.items)
-  );
-}
-
-function isValidPersistedState(state: unknown): boolean {
-  if (typeof state !== 'object' || state === null) return false;
-  const s = state as Record<string, unknown>;
-  if (!Array.isArray(s.boards) || s.boards.length === 0) return false;
-  return s.boards.every(isValidBoard);
-}
-
-// Run legacy data migration before store creation so persist middleware
-// finds the already-migrated data in localStorage.
-migrateLegacyData();
-
-export const useBoardModuleStore = create<BoardModuleState>()(
-  persist(
-    (set, get) => {
-      const defaultBoard = createDefaultBoard();
-
-      return {
-        // Initial state
-        boards: [defaultBoard],
-        activeBoardId: defaultBoard.id,
-        filters: {},
-
-        // Board CRUD
-        createBoard: (name: string) => {
-      const validation = validateBoardName(name);
-      if (!validation.success) {
-        return { success: false, error: validation.error };
+  fetchBoards: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const boards = await api.get<BoardSummary[]>('/boards');
+      const { activeBoardId } = get();
+      set({ boards, isLoading: false });
+      // Auto-select first board if none active
+      if (!activeBoardId && boards.length > 0) {
+        set({ activeBoardId: boards[0].id });
+        get().fetchBoard(boards[0].id);
       }
-
-      const trimmedName = name.trim();
-      const newBoard: Board = {
-        id: crypto.randomUUID(),
-        name: trimmedName,
-        items: [],
-        createdAt: new Date().toISOString(),
-      };
-
-      set((state) => ({
-        boards: [...state.boards, newBoard],
-        activeBoardId: newBoard.id,
-      }));
-
-      return { success: true };
-    },
-
-    renameBoard: (id: string, newName: string) => {
-      const validation = validateBoardName(newName);
-      if (!validation.success) {
-        return { success: false, error: validation.error };
-      }
-
-      const trimmedName = newName.trim();
-      const { boards } = get();
-      const boardExists = boards.some((b) => b.id === id);
-
-      if (!boardExists) {
-        return { success: false, error: 'Quadro não encontrado' };
-      }
-
-      set((state) => ({
-        boards: state.boards.map((board) =>
-          board.id === id ? { ...board, name: trimmedName } : board
-        ),
-      }));
-
-      return { success: true };
-    },
-
-    deleteBoard: (id: string) => {
-      const { boards, activeBoardId } = get();
-
-      // No-op if only one board exists
-      if (boards.length <= 1) {
-        return;
-      }
-
-      // No-op if board doesn't exist
-      const boardExists = boards.some((b) => b.id === id);
-      if (!boardExists) {
-        return;
-      }
-
-      const remainingBoards = boards.filter((b) => b.id !== id);
-
-      // Reassign activeBoardId if the deleted board was active
-      const newActiveBoardId =
-        activeBoardId === id ? remainingBoards[0].id : activeBoardId;
-
-      set({
-        boards: remainingBoards,
-        activeBoardId: newActiveBoardId,
-      });
-    },
-
-    setActiveBoard: (id: string) => {
-      const { boards } = get();
-      const boardExists = boards.some((b) => b.id === id);
-
-      // No-op if board doesn't exist
-      if (!boardExists) {
-        return;
-      }
-
-      set({ activeBoardId: id });
-    },
-
-    // Item CRUD (Task 3.1)
-    addItem: (content: string, type: BoardItemType) => {
-      const { activeBoardId, boards } = get();
-      if (!activeBoardId) return;
-
-      const validation = validateItemContent(content);
-      if (!validation.success) return;
-
-      const activeBoard = boards.find((b) => b.id === activeBoardId);
-      if (!activeBoard) return;
-
-      const now = new Date().toISOString();
-      const newItem: BoardItem = {
-        id: crypto.randomUUID(),
-        content,
-        type,
-        createdAt: now,
-        updatedAt: now,
-        position: {
-          x: Math.floor(Math.random() * (CANVAS_WIDTH - DEFAULT_ITEM_WIDTH + 1)),
-          y: Math.floor(Math.random() * (CANVAS_HEIGHT - DEFAULT_ITEM_HEIGHT + 1)),
-        },
-        size: {
-          width: DEFAULT_ITEM_WIDTH,
-          height: DEFAULT_ITEM_HEIGHT,
-        },
-      };
-
-      set((state) => ({
-        boards: state.boards.map((board) =>
-          board.id === activeBoardId
-            ? { ...board, items: [...board.items, newItem] }
-            : board
-        ),
-      }));
-    },
-
-    updateItem: (id: string, content: string) => {
-      const { activeBoardId, boards } = get();
-      if (!activeBoardId) return;
-
-      const validation = validateItemContent(content);
-      if (!validation.success) return;
-
-      const activeBoard = boards.find((b) => b.id === activeBoardId);
-      if (!activeBoard) return;
-
-      const itemExists = activeBoard.items.some((item) => item.id === id);
-      if (!itemExists) return;
-
-      set((state) => ({
-        boards: state.boards.map((board) =>
-          board.id === activeBoardId
-            ? {
-                ...board,
-                items: board.items.map((item) =>
-                  item.id === id
-                    ? { ...item, content, updatedAt: new Date().toISOString() }
-                    : item
-                ),
-              }
-            : board
-        ),
-      }));
-    },
-
-    removeItem: (id: string) => {
-      const { activeBoardId, boards } = get();
-      if (!activeBoardId) return;
-
-      const activeBoard = boards.find((b) => b.id === activeBoardId);
-      if (!activeBoard) return;
-
-      const itemExists = activeBoard.items.some((item) => item.id === id);
-      if (!itemExists) return;
-
-      set((state) => ({
-        boards: state.boards.map((board) =>
-          board.id === activeBoardId
-            ? { ...board, items: board.items.filter((item) => item.id !== id) }
-            : board
-        ),
-      }));
-    },
-
-    updatePosition: (id: string, position: BoardItemPosition) => {
-      const { activeBoardId, boards } = get();
-      if (!activeBoardId) return;
-
-      const activeBoard = boards.find((b) => b.id === activeBoardId);
-      if (!activeBoard) return;
-
-      const item = activeBoard.items.find((i) => i.id === id);
-      if (!item) return;
-
-      const clampedX = Math.max(0, Math.min(position.x, CANVAS_WIDTH - item.size.width));
-      const clampedY = Math.max(0, Math.min(position.y, CANVAS_HEIGHT - item.size.height));
-
-      set((state) => ({
-        boards: state.boards.map((board) =>
-          board.id === activeBoardId
-            ? {
-                ...board,
-                items: board.items.map((i) =>
-                  i.id === id
-                    ? { ...i, position: { x: clampedX, y: clampedY } }
-                    : i
-                ),
-              }
-            : board
-        ),
-      }));
-    },
-
-    updateSize: (id: string, size: BoardItemSize) => {
-      const { activeBoardId, boards } = get();
-      if (!activeBoardId) return;
-
-      const activeBoard = boards.find((b) => b.id === activeBoardId);
-      if (!activeBoard) return;
-
-      const item = activeBoard.items.find((i) => i.id === id);
-      if (!item) return;
-
-      // Clamp size within min/max limits
-      const clampedWidth = Math.max(MIN_ITEM_WIDTH, Math.min(size.width, MAX_ITEM_WIDTH));
-      const clampedHeight = Math.max(MIN_ITEM_HEIGHT, Math.min(size.height, MAX_ITEM_HEIGHT));
-
-      // Adjust position if item would exceed canvas bounds with new size
-      const clampedX = Math.max(0, Math.min(item.position.x, CANVAS_WIDTH - clampedWidth));
-      const clampedY = Math.max(0, Math.min(item.position.y, CANVAS_HEIGHT - clampedHeight));
-
-      set((state) => ({
-        boards: state.boards.map((board) =>
-          board.id === activeBoardId
-            ? {
-                ...board,
-                items: board.items.map((i) =>
-                  i.id === id
-                    ? {
-                        ...i,
-                        size: { width: clampedWidth, height: clampedHeight },
-                        position: { x: clampedX, y: clampedY },
-                      }
-                    : i
-                ),
-              }
-            : board
-        ),
-      }));
-    },
-
-    // Filters (Task 4.1)
-    setFilter: (boardId: string, filter: BoardFilter) => {
-      set((state) => ({
-        filters: { ...state.filters, [boardId]: filter },
-      }));
-    },
-    getActiveFilter: () => {
-      const { activeBoardId, filters } = get();
-      if (!activeBoardId) return 'all';
-      return filters[activeBoardId] ?? 'all';
-    },
-  };
-},
-    {
-      name: STORAGE_KEY,
-      storage: createJSONStorage(() => ({
-        getItem: (name: string) => localStorage.getItem(name),
-        setItem: (name: string, value: string) => {
-          try {
-            localStorage.setItem(name, value);
-          } catch (error) {
-            if (error instanceof DOMException && error.name === 'QuotaExceededError') {
-              console.warn('localStorage quota exceeded. Data not persisted.');
-            } else {
-              throw error;
-            }
-          }
-        },
-        removeItem: (name: string) => localStorage.removeItem(name),
-      })),
-      partialize: (state) => ({
-        boards: state.boards,
-        activeBoardId: state.activeBoardId,
-      }),
-      onRehydrateStorage: () => {
-        return (state, error) => {
-          if (error) {
-            console.warn('Failed to rehydrate board-module state:', error);
-            return;
-          }
-
-          if (!state) return;
-
-          // Validate the restored data structure
-          if (!isValidPersistedState(state)) {
-            console.warn('Invalid board-module data in localStorage. Initializing with default state.');
-            const defaultBoard = createDefaultBoard();
-            useBoardModuleStore.setState({
-              boards: [defaultBoard],
-              activeBoardId: defaultBoard.id,
-            });
-            return;
-          }
-
-          // Validate activeBoardId references an existing board
-          const boardIds = state.boards.map((b) => b.id);
-          if (!state.activeBoardId || !boardIds.includes(state.activeBoardId)) {
-            useBoardModuleStore.setState({
-              activeBoardId: state.boards[0].id,
-            });
-          }
-        };
-      },
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Failed to fetch boards';
+      set({ error: message, isLoading: false });
     }
-  )
-);
+  },
+
+  fetchBoard: async (id: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const board = await api.get<BoardSummary & { items: BoardItem[] }>(`/boards/${id}`);
+      set({ activeBoard: board, isLoading: false });
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Failed to fetch board';
+      set({ error: message, isLoading: false });
+    }
+  },
+
+  setActiveBoard: (id: string) => {
+    set({ activeBoardId: id });
+    get().fetchBoard(id);
+  },
+
+  createBoard: async (name: string) => {
+    const trimmedName = name.trim();
+    if (!trimmedName || trimmedName.length > 50) {
+      const error = !trimmedName
+        ? 'O nome do quadro é obrigatório'
+        : 'O nome do quadro deve ter no máximo 50 caracteres';
+      return { success: false, error };
+    }
+
+    set({ isLoading: true, error: null });
+    try {
+      const created = await api.post<BoardSummary>('/boards', { name: trimmedName });
+      await get().fetchBoards();
+      set({ activeBoardId: created.id });
+      await get().fetchBoard(created.id);
+      return { success: true };
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Failed to create board';
+      set({ error: message, isLoading: false });
+      return { success: false, error: message };
+    }
+  },
+
+  renameBoard: async (id: string, newName: string) => {
+    const trimmedName = newName.trim();
+    if (!trimmedName || trimmedName.length > 50) {
+      const error = !trimmedName
+        ? 'O nome do quadro é obrigatório'
+        : 'O nome do quadro deve ter no máximo 50 caracteres';
+      return { success: false, error };
+    }
+
+    set({ isLoading: true, error: null });
+    try {
+      await api.patch(`/boards/${id}`, { name: trimmedName });
+      await get().fetchBoards();
+      // Refresh active board if it was the one renamed
+      const { activeBoardId } = get();
+      if (activeBoardId === id) {
+        await get().fetchBoard(id);
+      }
+      set({ isLoading: false });
+      return { success: true };
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Failed to rename board';
+      set({ error: message, isLoading: false });
+      return { success: false, error: message };
+    }
+  },
+
+  deleteBoard: async (id: string) => {
+    const { boards, activeBoardId } = get();
+    if (boards.length <= 1) return;
+
+    set({ isLoading: true, error: null });
+    try {
+      await api.del(`/boards/${id}`);
+      await get().fetchBoards();
+
+      const { boards: updatedBoards } = get();
+      if (activeBoardId === id && updatedBoards.length > 0) {
+        const newActiveId = updatedBoards[0].id;
+        set({ activeBoardId: newActiveId });
+        await get().fetchBoard(newActiveId);
+      }
+      set({ isLoading: false });
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Failed to delete board';
+      set({ error: message, isLoading: false });
+    }
+  },
+
+  addItem: async (content: string, type: BoardItemType) => {
+    const { activeBoardId } = get();
+    if (!activeBoardId) return;
+
+    set({ isLoading: true, error: null });
+    try {
+      await api.post(`/boards/${activeBoardId}/items`, { content, type });
+      await get().fetchBoard(activeBoardId);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Failed to add item';
+      set({ error: message, isLoading: false });
+    }
+  },
+
+  updateItem: async (id: string, content: string) => {
+    const { activeBoardId } = get();
+    if (!activeBoardId) return;
+
+    set({ isLoading: true, error: null });
+    try {
+      await api.patch(`/boards/${activeBoardId}/items/${id}`, { content });
+      await get().fetchBoard(activeBoardId);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Failed to update item';
+      set({ error: message, isLoading: false });
+    }
+  },
+
+  removeItem: async (id: string) => {
+    const { activeBoardId } = get();
+    if (!activeBoardId) return;
+
+    set({ isLoading: true, error: null });
+    try {
+      await api.del(`/boards/${activeBoardId}/items/${id}`);
+      await get().fetchBoard(activeBoardId);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Failed to remove item';
+      set({ error: message, isLoading: false });
+    }
+  },
+
+  updatePosition: async (id: string, position: BoardItemPosition) => {
+    const { activeBoardId, activeBoard } = get();
+    if (!activeBoardId || !activeBoard) return;
+
+    // Round to integers (backend requires int)
+    const intPosition = { x: Math.round(position.x), y: Math.round(position.y) };
+
+    // Optimistic update
+    const previousItems = activeBoard.items;
+    const updatedItems = activeBoard.items.map((item) =>
+      item.id === id ? { ...item, position: intPosition } : item
+    );
+    set({ activeBoard: { ...activeBoard, items: updatedItems } });
+
+    try {
+      await api.patch(`/boards/${activeBoardId}/items/${id}/position`, intPosition);
+    } catch (e: unknown) {
+      // Revert on failure
+      set({ activeBoard: { ...activeBoard, items: previousItems } });
+      const message = e instanceof Error ? e.message : 'Failed to update position';
+      set({ error: message });
+    }
+  },
+
+  updateSize: async (id: string, size: BoardItemSize) => {
+    const { activeBoardId, activeBoard } = get();
+    if (!activeBoardId || !activeBoard) return;
+
+    // Round to integers (backend requires int)
+    const intSize = { width: Math.round(size.width), height: Math.round(size.height) };
+
+    // Optimistic update
+    const previousItems = activeBoard.items;
+    const updatedItems = activeBoard.items.map((item) =>
+      item.id === id ? { ...item, size: intSize } : item
+    );
+    set({ activeBoard: { ...activeBoard, items: updatedItems } });
+
+    try {
+      await api.patch(`/boards/${activeBoardId}/items/${id}/size`, intSize);
+    } catch (e: unknown) {
+      // Revert on failure
+      set({ activeBoard: { ...activeBoard, items: previousItems } });
+      const message = e instanceof Error ? e.message : 'Failed to update size';
+      set({ error: message });
+    }
+  },
+
+  // Filters (local only, not persisted to backend)
+  setFilter: (boardId: string, filter: BoardFilter) => {
+    set((state) => ({
+      filters: { ...state.filters, [boardId]: filter },
+    }));
+  },
+
+  getActiveFilter: () => {
+    const { activeBoardId, filters } = get();
+    if (!activeBoardId) return 'all';
+    return filters[activeBoardId] ?? 'all';
+  },
+}));

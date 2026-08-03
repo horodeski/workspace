@@ -42,7 +42,6 @@ export function AppSidebar() {
               asChild
               className={cn(
                 'w-full justify-start gap-3',
-                // NavLink will apply active styles via its className prop
               )}
             >
               <NavLink
@@ -62,6 +61,12 @@ export function AppSidebar() {
             </Button>
           ))}
         </nav>
+
+        <div className="px-3 pt-4">
+          <p className="text-xs text-muted-foreground">
+            Desenvolvido por Geovana Horodeski
+          </p>
+        </div>
       </aside>
       <Separator orientation="vertical" />
     </div>

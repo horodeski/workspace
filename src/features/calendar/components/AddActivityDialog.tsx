@@ -81,7 +81,7 @@ export function AddActivityDialog({ open, onOpenChange }: AddActivityDialogProps
     onOpenChange(newOpen);
   };
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     const trimmed = title.trim();
     if (!trimmed) {
       setError('O título é obrigatório');
@@ -92,7 +92,7 @@ export function AddActivityDialog({ open, onOpenChange }: AddActivityDialogProps
       return;
     }
 
-    addActivity({
+    await addActivity({
       title: trimmed,
       description: '',
       date,

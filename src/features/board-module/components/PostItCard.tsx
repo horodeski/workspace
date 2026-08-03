@@ -167,10 +167,10 @@ export const PostItCard: React.FC<PostItCardProps> = ({
         {/* Content area */}
         <div className="flex-1 min-h-0 overflow-hidden">
           {item.type === 'image' ? (
-            imageError ? (
+            imageError || !item.content.startsWith('http') ? (
               <div className="flex flex-col items-center justify-center h-full gap-2 text-gray-400">
                 <ImageOff className="h-8 w-8" />
-                <span className="text-xs text-center">Image could not be loaded</span>
+                <span className="text-xs text-center">Imagem não pôde ser carregada</span>
               </div>
             ) : (
               <img
@@ -179,6 +179,7 @@ export const PostItCard: React.FC<PostItCardProps> = ({
                 className="w-full h-full rounded"
                 style={{ objectFit: 'cover', objectPosition: 'center' }}
                 onError={handleImageError}
+                referrerPolicy="no-referrer"
               />
             )
           ) : (

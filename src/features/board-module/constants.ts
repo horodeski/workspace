@@ -4,15 +4,10 @@ export const BOARD_NAME_MAX_LENGTH = 50;
 
 // Default board names
 export const DEFAULT_BOARD_NAME = 'Meu Quadro';
-export const LEGACY_BOARD_NAME = 'Inspirações';
-
-// Storage keys
-export const STORAGE_KEY = 'board-module-storage';
-export const LEGACY_STORAGE_KEY = 'inspiration-board-storage';
 
 // Canvas dimensions
-export const CANVAS_WIDTH = 3000;
-export const CANVAS_HEIGHT = 2000;
+export const CANVAS_WIDTH = 1920;
+export const CANVAS_HEIGHT = 1080;
 
 // Item size defaults
 export const DEFAULT_ITEM_WIDTH = 240;

@@ -1,5 +1,4 @@
 import React, { useState, useCallback } from 'react';
-import { CANVAS_WIDTH, CANVAS_HEIGHT } from '../constants';
 import { EmptyState } from './EmptyState';
 import { PostItCard } from './PostItCard';
 import type { BoardItem } from '../types/board.types';
@@ -38,7 +37,7 @@ export const FreeformCanvas: React.FC<FreeformCanvasProps> = ({
   if (items.length === 0) {
     return (
       <div
-        className="relative flex-1 overflow-auto"
+        className="relative flex-1 overflow-hidden"
         data-testid="freeform-canvas"
       >
         <EmptyState variant={emptyVariant} onAddItem={onAddItem} />
@@ -48,17 +47,11 @@ export const FreeformCanvas: React.FC<FreeformCanvasProps> = ({
 
   return (
     <div
-      className="relative flex-1 overflow-auto"
+      className="relative flex-1 overflow-hidden"
       data-testid="freeform-canvas"
     >
       <div
-        className="relative"
-        style={{
-          width: CANVAS_WIDTH,
-          height: CANVAS_HEIGHT,
-          minWidth: CANVAS_WIDTH,
-          minHeight: CANVAS_HEIGHT,
-        }}
+        className="relative w-full h-full"
         data-testid="freeform-canvas-inner"
       >
         {items.map((item) => (

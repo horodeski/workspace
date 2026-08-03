@@ -4,9 +4,11 @@ import { HistoryItem } from './HistoryItem';
 
 export interface HistoryListProps {
   items: WeekHistoryItem[];
+  currentWeek: number;
+  currentYear: number;
 }
 
-export const HistoryList: React.FC<HistoryListProps> = ({ items }) => {
+export const HistoryList: React.FC<HistoryListProps> = ({ items, currentWeek, currentYear }) => {
   // Group items by year (items are already in reverse chronological order)
   const groupedByYear = items.reduce<Record<number, WeekHistoryItem[]>>(
     (groups, item) => {
@@ -39,6 +41,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({ items }) => {
                   year={item.year}
                   hasReview={item.hasReview}
                   isLocked={item.isLocked}
+                  isCurrent={item.weekNumber === currentWeek && item.year === currentYear}
                 />
               </li>
             ))}

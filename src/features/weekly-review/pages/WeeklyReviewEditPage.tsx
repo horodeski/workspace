@@ -1,10 +1,10 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { startOfISOWeek, addDays } from 'date-fns';
 
-import { reviewFormSchema, stripHtml, type ReviewFormData } from '../types/review.types';
+import { reviewFormSchema, stripHtml, type ReviewFormData, type Review } from '../types/review.types';
 import { useReviewStore } from '../hooks/useReviewStore';
 import { getISOWeekData, formatWeekRange } from '../services/weekCalculation';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
@@ -86,31 +86,48 @@ export const WeeklyReviewEditPage: React.FC = () => {
   }, [weekData]);
 
   // Get existing review
-  const existingReview = isValidParams ? getReviewByWeek(yearNum, weekNum) : undefined;
-  const [isLocked, setIsLocked] = useState(existingReview?.isLocked ?? false);
+  const [existingReview, setExistingReview] = useState<Review | null>(null);
+  const [isLocked, setIsLocked] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [saveError, setSaveError] = useState<string | undefined>(undefined);
 
+  useEffect(() => {
+    if (!isValidParams) return;
+    let cancelled = false;
+    getReviewByWeek(yearNum, weekNum).then((review) => {
+      if (!cancelled && review) {
+        setExistingReview(review);
+        setIsLocked(review.isLocked);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [yearNum, weekNum, isValidParams, getReviewByWeek]);
+
   const form = useForm<ReviewFormData>({
     resolver: zodResolver(reviewFormSchema),
-    defaultValues: existingReview
-      ? {
-          learning: existingReview.learning,
-          decisions: existingReview.decisions,
-          resolvedProblems: existingReview.resolvedProblems,
-          timeWaste: existingReview.timeWaste,
-          nextWeekFocus: existingReview.nextWeekFocus,
-        }
-      : {
-          learning: '',
-          decisions: '',
-          resolvedProblems: '',
-          timeWaste: '',
-          nextWeekFocus: '',
-        },
+    defaultValues: {
+      learning: '',
+      decisions: '',
+      resolvedProblems: '',
+      timeWaste: '',
+      nextWeekFocus: '',
+    },
     mode: 'onChange',
   });
+
+  // Reset form when existing review is loaded
+  useEffect(() => {
+    if (existingReview) {
+      form.reset({
+        learning: existingReview.learning,
+        decisions: existingReview.decisions,
+        resolvedProblems: existingReview.resolvedProblems,
+        timeWaste: existingReview.timeWaste,
+        nextWeekFocus: existingReview.nextWeekFocus,
+      });
+    }
+  }, [existingReview, form]);
 
   // Track real dirty state by comparing actual text content (not HTML structure)
   const hasRealChanges = useCallback(() => {

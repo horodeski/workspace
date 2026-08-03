@@ -1,16 +1,31 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useReviewStore } from '../hooks/useReviewStore';
 import { useWeekCalculation } from '../hooks/useWeekCalculation';
 import { EmptyState } from '../components/EmptyState';
 import { CurrentWeekCard } from '../components/CurrentWeekCard';
 import { HistoryList } from '../components/HistoryList';
+import type { Review } from '../types/review.types';
 
 export const WeeklyReviewPage: React.FC = () => {
-  const { reviews, getReviewByWeek, getRecentWeeks } = useReviewStore();
+  const { reviews, getReviewByWeek, getRecentWeeks, fetchRecentWeeks } = useReviewStore();
   const { weekNumber, year } = useWeekCalculation();
+  const [currentWeekReview, setCurrentWeekReview] = useState<Review | null>(null);
+
+  useEffect(() => {
+    fetchRecentWeeks();
+  }, [fetchRecentWeeks]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getReviewByWeek(year, weekNumber).then((review) => {
+      if (!cancelled) {
+        setCurrentWeekReview(review);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [year, weekNumber, getReviewByWeek]);
 
   const hasReviews = reviews.length > 0;
-  const currentWeekReview = getReviewByWeek(year, weekNumber);
   const recentWeeks = getRecentWeeks();
 
   if (!hasReviews) {
@@ -38,7 +53,7 @@ export const WeeklyReviewPage: React.FC = () => {
         </div>
       )}
 
-      <HistoryList items={recentWeeks} />
+      <HistoryList items={recentWeeks} currentWeek={weekNumber} currentYear={year} />
     </div>
   );
 };

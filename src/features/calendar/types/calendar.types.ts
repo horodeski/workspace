@@ -33,6 +33,10 @@ export interface Activity {
   attachments: ActivityAttachment[];
   createdAt: string; // ISO 8601
   updatedAt: string; // ISO 8601
+  // Backend-expanded fields
+  isRecurrenceInstance?: boolean;
+  instanceDate?: string; // YYYY-MM-DD for recurrence instances
+  completedOnDate?: string | null; // date when completed (for recurrence instances)
 }
 
 export const activitySchema = z.object({

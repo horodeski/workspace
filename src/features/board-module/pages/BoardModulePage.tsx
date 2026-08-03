@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,6 +23,7 @@ import type { BoardFilter } from '../types/board.types';
 export const BoardModulePage: React.FC = () => {
   const {
     boards,
+    activeBoard,
     activeBoardId,
     createBoard,
     renameBoard,
@@ -35,6 +36,7 @@ export const BoardModulePage: React.FC = () => {
     updateSize,
     getActiveFilter,
     setFilter,
+    fetchBoards,
   } = useBoardModuleStore();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -48,10 +50,10 @@ export const BoardModulePage: React.FC = () => {
   const [renameBoardValue, setRenameBoardValue] = useState('');
   const [renameBoardError, setRenameBoardError] = useState<string | null>(null);
 
-  const activeBoard = useMemo(
-    () => boards.find((b) => b.id === activeBoardId),
-    [boards, activeBoardId]
-  );
+  // Fetch boards on mount
+  useEffect(() => {
+    fetchBoards();
+  }, [fetchBoards]);
 
   const activeFilter = getActiveFilter();
 
@@ -75,8 +77,8 @@ export const BoardModulePage: React.FC = () => {
     setIsCreateBoardOpen(true);
   };
 
-  const handleConfirmCreateBoard = () => {
-    const result = createBoard(newBoardName);
+  const handleConfirmCreateBoard = async () => {
+    const result = await createBoard(newBoardName);
     if (result.success) {
       setIsCreateBoardOpen(false);
       setNewBoardName('');
@@ -99,9 +101,9 @@ export const BoardModulePage: React.FC = () => {
     setIsRenameBoardOpen(true);
   };
 
-  const handleConfirmRename = () => {
+  const handleConfirmRename = async () => {
     if (!renameBoardId) return;
-    const result = renameBoard(renameBoardId, renameBoardValue);
+    const result = await renameBoard(renameBoardId, renameBoardValue);
     if (result.success) {
       setIsRenameBoardOpen(false);
       setRenameBoardId(null);

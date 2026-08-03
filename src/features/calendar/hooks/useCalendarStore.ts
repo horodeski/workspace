@@ -19,6 +19,7 @@ import {
   ActivityFormData,
   ActivityAttachment,
 } from '../types/calendar.types';
+import { api } from '@/lib/api';
 
 interface CalendarState {
   selectedDate: Date;
@@ -30,6 +31,9 @@ interface CalendarState {
   isActivityDetailOpen: boolean;
   events: CalendarEventType[];
   activities: Activity[];
+  monthActivities: Activity[];
+  isLoading: boolean;
+  error: string | null;
 }
 
 interface CalendarActions {
@@ -48,12 +52,12 @@ interface CalendarActions {
   goToToday: () => void;
   navigateForward: () => void;
   navigateBack: () => void;
-  // Activity actions
-  addActivity: (data: ActivityFormData) => void;
-  updateActivity: (id: string, data: Partial<Activity>) => void;
-  toggleActivity: (id: string) => void;
-  removeActivity: (id: string) => void;
-  getActivitiesForDate: (date: Date) => Activity[];
+  // Activity actions (async, API-backed)
+  fetchActivitiesForDate: (date: Date) => Promise<void>;
+  addActivity: (data: ActivityFormData) => Promise<void>;
+  updateActivity: (id: string, data: Partial<Activity>) => Promise<void>;
+  toggleActivity: (id: string) => Promise<void>;
+  removeActivity: (id: string) => Promise<void>;
   openActivityDetail: (activity: Activity) => void;
   closeActivityDetail: () => void;
   addAttachment: (activityId: string, attachment: ActivityAttachment) => void;
@@ -72,10 +76,14 @@ export const useCalendarStore = create<CalendarState & CalendarActions>(
     isActivityDetailOpen: false,
     events: [],
     activities: [],
+    monthActivities: [],
+    isLoading: false,
+    error: null,
 
     // Actions
     setSelectedDate: (date: Date) => {
       set({ selectedDate: date });
+      get().fetchActivitiesForDate(date);
     },
 
     setViewMode: (mode: ViewMode) => {
@@ -117,7 +125,6 @@ export const useCalendarStore = create<CalendarState & CalendarActions>(
       const eventIndex = events.findIndex((e) => e.id === id);
 
       if (eventIndex === -1) {
-        // Event not found — no-op, close drawer
         set({ selectedEvent: null, isDrawerOpen: false });
         return;
       }
@@ -143,7 +150,6 @@ export const useCalendarStore = create<CalendarState & CalendarActions>(
           events: state.events.filter((e) => e.id !== id),
         };
 
-        // If the removed event is the selected event, close drawer
         if (selectedEvent && selectedEvent.id === id) {
           newState.selectedEvent = null;
           newState.isDrawerOpen = false;
@@ -161,7 +167,6 @@ export const useCalendarStore = create<CalendarState & CalendarActions>(
       return events.filter((event) => {
         const eventStart = parseISO(event.startTime);
         const eventEnd = parseISO(event.endTime);
-        // Event intersects with the day if it starts before day ends AND ends after day starts
         return eventStart <= dayEnd && eventEnd >= dayStart;
       });
     },
@@ -174,7 +179,6 @@ export const useCalendarStore = create<CalendarState & CalendarActions>(
       return events.filter((event) => {
         const eventStart = parseISO(event.startTime);
         const eventEnd = parseISO(event.endTime);
-        // Event intersects with the week range
         return eventStart <= rangeEnd && eventEnd >= rangeStart;
       });
     },
@@ -187,132 +191,155 @@ export const useCalendarStore = create<CalendarState & CalendarActions>(
       return events.filter((event) => {
         const eventStart = parseISO(event.startTime);
         const eventEnd = parseISO(event.endTime);
-        // Event intersects with the month range
         return eventStart <= rangeEnd && eventEnd >= rangeStart;
       });
     },
 
     goToToday: () => {
-      set({ selectedDate: new Date() });
+      const today = new Date();
+      set({ selectedDate: today });
+      get().fetchActivitiesForDate(today);
     },
 
     navigateForward: () => {
       const { selectedDate, viewMode } = get();
+      let newDate: Date;
       switch (viewMode) {
         case 'day':
-          set({ selectedDate: addDays(selectedDate, 1) });
+          newDate = addDays(selectedDate, 1);
           break;
         case 'week':
-          set({ selectedDate: addDays(selectedDate, 7) });
+          newDate = addDays(selectedDate, 7);
           break;
         case 'month':
         default:
-          set({ selectedDate: addMonths(selectedDate, 1) });
+          newDate = addMonths(selectedDate, 1);
           break;
       }
+      set({ selectedDate: newDate });
+      get().fetchActivitiesForDate(newDate);
     },
 
     navigateBack: () => {
       const { selectedDate, viewMode } = get();
+      let newDate: Date;
       switch (viewMode) {
         case 'day':
-          set({ selectedDate: subDays(selectedDate, 1) });
+          newDate = subDays(selectedDate, 1);
           break;
         case 'week':
-          set({ selectedDate: subDays(selectedDate, 7) });
+          newDate = subDays(selectedDate, 7);
           break;
         case 'month':
         default:
-          set({ selectedDate: subMonths(selectedDate, 1) });
+          newDate = subMonths(selectedDate, 1);
           break;
+      }
+      set({ selectedDate: newDate });
+      get().fetchActivitiesForDate(newDate);
+    },
+
+    // Activity actions (async, API-backed)
+    fetchActivitiesForDate: async (date: Date) => {
+      const dateStr = format(date, 'yyyy-MM-dd');
+      set({ isLoading: true, error: null });
+      try {
+        const raw = await api.get<(Activity & { completedOnDate?: boolean })[]>(`/activities?date=${dateStr}`);
+        // Map backend field `completedOnDate` to frontend field `completed`
+        const activities = raw.map((a) => ({
+          ...a,
+          completed: a.completedOnDate ?? a.completed ?? false,
+          attachments: a.attachments ?? [],
+        }));
+        set({ activities, isLoading: false });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to fetch activities';
+        set({ error: message, isLoading: false });
       }
     },
 
-    // Activity actions
-    addActivity: (data: ActivityFormData) => {
-      const now = new Date().toISOString();
-      const newActivity: Activity = {
-        id: crypto.randomUUID(),
-        title: data.title,
-        description: data.description || '',
-        completed: false,
-        date: data.date,
-        startTime: data.startTime || null,
-        duration: data.duration || null,
-        recurrence: data.recurrence || 'weekday',
-        priority: data.priority || null,
-        attachments: [],
-        createdAt: now,
-        updatedAt: now,
-      };
-
-      set((state) => ({
-        activities: [...state.activities, newActivity],
-      }));
+    fetchActivitiesForMonth: async (month: Date) => {
+      const start = format(startOfMonth(month), 'yyyy-MM-dd');
+      const end = format(endOfMonth(month), 'yyyy-MM-dd');
+      try {
+        const raw = await api.get<(Activity & { completedOnDate?: boolean })[]>(`/activities?startDate=${start}&endDate=${end}`);
+        const monthActivities = raw.map((a) => ({
+          ...a,
+          completed: a.completedOnDate ?? a.completed ?? false,
+          attachments: a.attachments ?? [],
+        }));
+        set({ monthActivities });
+      } catch {
+        // Silently fail — month view is supplementary
+      }
     },
 
-    updateActivity: (id: string, data: Partial<Activity>) => {
-      set((state) => ({
-        activities: state.activities.map((a) =>
-          a.id === id ? { ...a, ...data, updatedAt: new Date().toISOString() } : a
-        ),
-        selectedActivity:
-          state.selectedActivity?.id === id
-            ? { ...state.selectedActivity, ...data, updatedAt: new Date().toISOString() }
-            : state.selectedActivity,
-      }));
+    addActivity: async (data: ActivityFormData) => {
+      set({ isLoading: true, error: null });
+      try {
+        await api.post('/activities', data);
+        const { selectedDate } = get();
+        await get().fetchActivitiesForDate(selectedDate);
+        await (get() as any).fetchActivitiesForMonth(selectedDate);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to add activity';
+        set({ error: message, isLoading: false });
+      }
     },
 
-    toggleActivity: (id: string) => {
-      set((state) => ({
-        activities: state.activities.map((a) =>
-          a.id === id ? { ...a, completed: !a.completed, updatedAt: new Date().toISOString() } : a
-        ),
-        selectedActivity:
-          state.selectedActivity?.id === id
-            ? { ...state.selectedActivity, completed: !state.selectedActivity.completed, updatedAt: new Date().toISOString() }
-            : state.selectedActivity,
-      }));
-    },
-
-    removeActivity: (id: string) => {
-      set((state) => ({
-        activities: state.activities.filter((a) => a.id !== id),
-        selectedActivity: state.selectedActivity?.id === id ? null : state.selectedActivity,
-        isActivityDetailOpen: state.selectedActivity?.id === id ? false : state.isActivityDetailOpen,
-      }));
-    },
-
-    getActivitiesForDate: (date: Date) => {
-      const { activities } = get();
-      const dateStr = format(date, 'yyyy-MM-dd');
-
-      return activities.filter((a) => {
-        // Direct match
-        if (a.date === dateStr) return true;
-
-        // Recurrence logic: only show if activity date is on or before the target date
-        const activityDate = new Date(a.date + 'T00:00:00');
-        if (activityDate > date) return false;
-
-        switch (a.recurrence) {
-          case 'weekday': {
-            // Monday (1) to Friday (5)
-            const dayOfWeek = date.getDay();
-            return dayOfWeek >= 1 && dayOfWeek <= 5;
-          }
-          case 'daily':
-            return true;
-          case 'weekly': {
-            return activityDate.getDay() === date.getDay();
-          }
-          case 'monthly': {
-            return activityDate.getDate() === date.getDate();
-          }
-          default:
-            return false;
+    updateActivity: async (id: string, data: Partial<Activity>) => {
+      set({ isLoading: true, error: null });
+      try {
+        await api.put(`/activities/${id}`, data);
+        const { selectedDate } = get();
+        await get().fetchActivitiesForDate(selectedDate);
+        await (get() as any).fetchActivitiesForMonth(selectedDate);
+        // Update selectedActivity if it's the one being edited
+        const { selectedActivity, activities } = get();
+        if (selectedActivity?.id === id) {
+          const updated = activities.find((a) => a.id === id);
+          if (updated) set({ selectedActivity: updated });
         }
-      });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to update activity';
+        set({ error: message, isLoading: false });
+      }
+    },
+
+    toggleActivity: async (id: string) => {
+      const { selectedDate } = get();
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      set({ isLoading: true, error: null });
+      try {
+        await api.patch(`/activities/${id}/toggle`, { date: dateStr });
+        await get().fetchActivitiesForDate(selectedDate);
+        await (get() as any).fetchActivitiesForMonth(selectedDate);
+        // Update selectedActivity if it's the one being toggled
+        const { selectedActivity, activities } = get();
+        if (selectedActivity?.id === id) {
+          const updated = activities.find((a) => a.id === id);
+          if (updated) set({ selectedActivity: updated });
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to toggle activity';
+        set({ error: message, isLoading: false });
+      }
+    },
+
+    removeActivity: async (id: string) => {
+      set({ isLoading: true, error: null });
+      try {
+        await api.del(`/activities/${id}`);
+        const { selectedDate, selectedActivity } = get();
+        await get().fetchActivitiesForDate(selectedDate);
+        await (get() as any).fetchActivitiesForMonth(selectedDate);
+        if (selectedActivity?.id === id) {
+          set({ selectedActivity: null, isActivityDetailOpen: false });
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to remove activity';
+        set({ error: message, isLoading: false });
+      }
     },
 
     openActivityDetail: (activity: Activity) => {

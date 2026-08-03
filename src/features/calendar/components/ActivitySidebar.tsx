@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { format, isBefore, isToday, parse } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Plus, Trash2, Clock, Repeat, ChevronRight, CalendarDays, Sun, Sunset, Moon, Paperclip, FileText, AlertTriangle } from 'lucide-react';
@@ -94,12 +94,19 @@ export function ActivitySidebar({ hasSelectedDate }: ActivitySidebarProps) {
   const [deleteTarget, setDeleteTarget] = useState<Activity | null>(null);
 
   const selectedDate = useCalendarStore((state) => state.selectedDate);
-  // Subscribe to activities array to trigger re-renders on changes
-  useCalendarStore((state) => state.activities);
+  const activities = useCalendarStore((state) => state.activities);
+  const isLoading = useCalendarStore((state) => state.isLoading);
   const toggleActivity = useCalendarStore((state) => state.toggleActivity);
   const removeActivity = useCalendarStore((state) => state.removeActivity);
   const openActivityDetail = useCalendarStore((state) => state.openActivityDetail);
-  const getActivitiesForDate = useCalendarStore((state) => state.getActivitiesForDate);
+  const fetchActivitiesForDate = useCalendarStore((state) => state.fetchActivitiesForDate);
+
+  // Fetch activities when selectedDate changes
+  useEffect(() => {
+    if (hasSelectedDate) {
+      fetchActivitiesForDate(selectedDate);
+    }
+  }, [selectedDate, hasSelectedDate, fetchActivitiesForDate]);
 
   if (!hasSelectedDate) {
     return (
@@ -110,7 +117,16 @@ export function ActivitySidebar({ hasSelectedDate }: ActivitySidebarProps) {
     );
   }
 
-  const dayActivities = getActivitiesForDate(selectedDate);
+  if (isLoading && activities.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-zinc-500 gap-3">
+        <div className="animate-spin h-6 w-6 border-2 border-zinc-400 border-t-transparent rounded-full" />
+        <p className="text-sm">Carregando...</p>
+      </div>
+    );
+  }
+
+  const dayActivities = activities;
   const groups = groupActivitiesByPeriod(dayActivities);
   const dateLabel = format(selectedDate, "EEEE, d 'de' MMMM", { locale: ptBR });
   const completedCount = dayActivities.filter((a) => a.completed).length;

@@ -1,106 +1,165 @@
 import { useSupportCardStore } from '../hooks/useRoutineStore';
+import { api } from '@/lib/api';
+
+jest.mock('@/lib/api', () => ({
+  api: {
+    get: jest.fn(),
+    post: jest.fn(),
+    del: jest.fn(),
+  },
+}));
+
+const mockedApi = api as jest.Mocked<typeof api>;
 
 describe('useSupportCardStore', () => {
   beforeEach(() => {
-    useSupportCardStore.setState({ entries: [] });
+    useSupportCardStore.setState({ entries: [], formattedText: '', isLoading: false, error: null });
+    jest.clearAllMocks();
+  });
+
+  describe('fetchEntries', () => {
+    it('should fetch entries from API and update state', async () => {
+      const mockEntries = [
+        { id: '1', date: '03/02', description: 'Task 1', duration: '1h', observation: '', attachments: [], createdAt: '2024-01-01T00:00:00Z' },
+      ];
+      mockedApi.get.mockResolvedValueOnce(mockEntries);
+
+      await useSupportCardStore.getState().fetchEntries();
+
+      expect(mockedApi.get).toHaveBeenCalledWith('/support-entries');
+      const { entries, isLoading } = useSupportCardStore.getState();
+      expect(entries).toEqual(mockEntries);
+      expect(isLoading).toBe(false);
+    });
+
+    it('should set error on failure', async () => {
+      mockedApi.get.mockRejectedValueOnce(new Error('Network error'));
+
+      await useSupportCardStore.getState().fetchEntries();
+
+      const { error, isLoading } = useSupportCardStore.getState();
+      expect(error).toBe('Network error');
+      expect(isLoading).toBe(false);
+    });
   });
 
   describe('addEntry', () => {
-    it('should add a new entry with correct fields', () => {
-      const { addEntry } = useSupportCardStore.getState();
+    it('should POST to API and refetch entries', async () => {
+      const newEntry = { date: '03/02', description: 'Ajudei o Heitor', duration: '2h', observation: '' };
+      const mockEntries = [
+        { id: '1', date: '03/02', description: 'Ajudei o Heitor', duration: '2h', observation: '', attachments: [], createdAt: '2024-01-01T00:00:00Z' },
+      ];
+      mockedApi.post.mockResolvedValueOnce({ id: '1', ...newEntry });
+      mockedApi.get.mockResolvedValueOnce(mockEntries);
 
-      addEntry({
-        date: '03/02',
-        description: 'Ajudei o Heitor a subir o ambiente',
-        duration: '2h',
-        observation: 'foto da ligação',
-      });
+      await useSupportCardStore.getState().addEntry(newEntry);
 
+      expect(mockedApi.post).toHaveBeenCalledWith('/support-entries', newEntry);
+      expect(mockedApi.get).toHaveBeenCalledWith('/support-entries');
       const { entries } = useSupportCardStore.getState();
-      expect(entries).toHaveLength(1);
-      expect(entries[0].date).toBe('03/02');
-      expect(entries[0].description).toBe('Ajudei o Heitor a subir o ambiente');
-      expect(entries[0].duration).toBe('2h');
-      expect(entries[0].observation).toBe('foto da ligação');
-      expect(entries[0].id).toBeDefined();
-      expect(entries[0].createdAt).toBeDefined();
+      expect(entries).toEqual(mockEntries);
     });
 
-    it('should generate unique IDs for each entry', () => {
-      const { addEntry } = useSupportCardStore.getState();
+    it('should set error on failure', async () => {
+      mockedApi.post.mockRejectedValueOnce(new Error('Failed to add'));
 
-      addEntry({ date: '03/02', description: 'Task 1', duration: '1h', observation: '' });
-      addEntry({ date: '04/02', description: 'Task 2', duration: '30min', observation: '' });
+      await useSupportCardStore.getState().addEntry({ date: '03/02', description: 'X', duration: '1h', observation: '' });
 
-      const { entries } = useSupportCardStore.getState();
-      expect(entries[0].id).not.toBe(entries[1].id);
+      const { error } = useSupportCardStore.getState();
+      expect(error).toBe('Failed to add');
     });
   });
 
   describe('removeEntry', () => {
-    it('should remove an entry by id', () => {
-      const { addEntry } = useSupportCardStore.getState();
-      addEntry({ date: '03/02', description: 'Task 1', duration: '1h', observation: '' });
-      addEntry({ date: '04/02', description: 'Task 2', duration: '2h', observation: '' });
+    it('should DELETE via API and refetch entries', async () => {
+      mockedApi.del.mockResolvedValueOnce(undefined);
+      mockedApi.get.mockResolvedValueOnce([]);
 
+      await useSupportCardStore.getState().removeEntry('entry-1');
+
+      expect(mockedApi.del).toHaveBeenCalledWith('/support-entries/entry-1');
+      expect(mockedApi.get).toHaveBeenCalledWith('/support-entries');
       const { entries } = useSupportCardStore.getState();
-      const idToRemove = entries[0].id;
+      expect(entries).toEqual([]);
+    });
 
-      useSupportCardStore.getState().removeEntry(idToRemove);
+    it('should set error on failure', async () => {
+      mockedApi.del.mockRejectedValueOnce(new Error('Not found'));
 
-      const updated = useSupportCardStore.getState().entries;
-      expect(updated).toHaveLength(1);
-      expect(updated[0].description).toBe('Task 2');
+      await useSupportCardStore.getState().removeEntry('entry-1');
+
+      const { error } = useSupportCardStore.getState();
+      expect(error).toBe('Not found');
     });
   });
 
   describe('clearEntries', () => {
-    it('should remove all entries', () => {
-      const { addEntry } = useSupportCardStore.getState();
-      addEntry({ date: '03/02', description: 'Task 1', duration: '1h', observation: '' });
-      addEntry({ date: '04/02', description: 'Task 2', duration: '2h', observation: '' });
+    it('should POST to clear endpoint and refetch entries', async () => {
+      mockedApi.post.mockResolvedValueOnce(undefined);
+      mockedApi.get.mockResolvedValueOnce([]);
 
-      useSupportCardStore.getState().clearEntries();
+      await useSupportCardStore.getState().clearEntries();
 
+      expect(mockedApi.post).toHaveBeenCalledWith('/support-entries/clear');
+      expect(mockedApi.get).toHaveBeenCalledWith('/support-entries');
       const { entries } = useSupportCardStore.getState();
-      expect(entries).toHaveLength(0);
+      expect(entries).toEqual([]);
+    });
+
+    it('should set error on failure', async () => {
+      mockedApi.post.mockRejectedValueOnce(new Error('Server error'));
+
+      await useSupportCardStore.getState().clearEntries();
+
+      const { error } = useSupportCardStore.getState();
+      expect(error).toBe('Server error');
     });
   });
 
   describe('getFormattedText', () => {
-    it('should return empty string when no entries', () => {
-      const text = useSupportCardStore.getState().getFormattedText();
-      expect(text).toBe('');
+    it('should fetch formatted text from API', async () => {
+      mockedApi.get.mockResolvedValueOnce({ text: '03/02\nTask 1 por 1h.' });
+
+      const result = await useSupportCardStore.getState().getFormattedText();
+
+      expect(mockedApi.get).toHaveBeenCalledWith('/support-entries/formatted-text');
+      expect(result).toBe('03/02\nTask 1 por 1h.');
+      expect(useSupportCardStore.getState().formattedText).toBe('03/02\nTask 1 por 1h.');
     });
 
-    it('should format a single entry without observation', () => {
-      const { addEntry } = useSupportCardStore.getState();
-      addEntry({ date: '03/02', description: 'Ajudei o Heitor', duration: '2h', observation: '' });
+    it('should return empty string on failure', async () => {
+      mockedApi.get.mockRejectedValueOnce(new Error('Failed'));
 
-      const text = useSupportCardStore.getState().getFormattedText();
-      expect(text).toBe('03/02\nAjudei o Heitor por 2h.');
+      const result = await useSupportCardStore.getState().getFormattedText();
+
+      expect(result).toBe('');
+      expect(useSupportCardStore.getState().error).toBe('Failed');
     });
+  });
 
-    it('should format a single entry with observation', () => {
-      const { addEntry } = useSupportCardStore.getState();
-      addEntry({
-        date: '03/02',
-        description: 'Ajudei o Heitor a subir o ambiente',
-        duration: '2h',
-        observation: 'foto da ligação',
+  describe('getAllAttachments', () => {
+    it('should return empty array when entries have no attachments', () => {
+      useSupportCardStore.setState({
+        entries: [
+          { id: '1', date: '03/02', description: 'Task', duration: '1h', observation: '', attachments: [], createdAt: '2024-01-01T00:00:00Z' },
+        ],
       });
 
-      const text = useSupportCardStore.getState().getFormattedText();
-      expect(text).toBe('03/02\nAjudei o Heitor a subir o ambiente por 2h.\nfoto da ligação');
+      const result = useSupportCardStore.getState().getAllAttachments();
+      expect(result).toEqual([]);
     });
 
-    it('should separate multiple entries with double newlines', () => {
-      const { addEntry } = useSupportCardStore.getState();
-      addEntry({ date: '03/02', description: 'Task 1', duration: '1h', observation: '' });
-      addEntry({ date: '04/02', description: 'Task 2', duration: '30min', observation: 'nota' });
+    it('should collect all attachments across entries', () => {
+      const attachment = { id: 'a1', name: 'file.pdf', type: 'application/pdf', size: 1024, dataUrl: 'data:...' };
+      useSupportCardStore.setState({
+        entries: [
+          { id: '1', date: '03/02', description: 'Task', duration: '1h', observation: '', attachments: [attachment], createdAt: '2024-01-01T00:00:00Z' },
+        ],
+      });
 
-      const text = useSupportCardStore.getState().getFormattedText();
-      expect(text).toBe('03/02\nTask 1 por 1h.\n\n04/02\nTask 2 por 30min.\nnota');
+      const result = useSupportCardStore.getState().getAllAttachments();
+      expect(result).toHaveLength(1);
+      expect(result[0].attachment).toEqual(attachment);
     });
   });
 });

@@ -1,4 +1,18 @@
 import { useCalendarStore } from '../hooks/useCalendarStore';
+import { api } from '@/lib/api';
+
+// Mock the API module
+jest.mock('@/lib/api', () => ({
+  api: {
+    get: jest.fn().mockResolvedValue([]),
+    post: jest.fn().mockResolvedValue({}),
+    put: jest.fn().mockResolvedValue({}),
+    patch: jest.fn().mockResolvedValue({}),
+    del: jest.fn().mockResolvedValue(undefined),
+  },
+}));
+
+const mockedApi = api as jest.Mocked<typeof api>;
 
 const validEventData = {
   title: 'Test Meeting',
@@ -11,6 +25,7 @@ const validEventData = {
 };
 
 beforeEach(() => {
+  jest.clearAllMocks();
   useCalendarStore.setState({
     selectedDate: new Date('2024-01-15'),
     viewMode: 'day',
@@ -21,6 +36,8 @@ beforeEach(() => {
     isActivityDetailOpen: false,
     events: [],
     activities: [],
+    isLoading: false,
+    error: null,
   });
 });
 
@@ -268,6 +285,117 @@ describe('useCalendarStore', () => {
       const state = useCalendarStore.getState();
       expect(state.viewMode).toBe('month');
       expect(state.isExpanded).toBe(true);
+    });
+  });
+
+  describe('fetchActivitiesForDate', () => {
+    it('fetches activities from API and stores them', async () => {
+      const mockActivities = [
+        {
+          id: '1',
+          title: 'Test Activity',
+          description: '',
+          completed: false,
+          date: '2024-01-15',
+          startTime: '09:00',
+          duration: 60,
+          recurrence: 'none',
+          priority: null,
+          attachments: [],
+          createdAt: '2024-01-15T00:00:00.000Z',
+          updatedAt: '2024-01-15T00:00:00.000Z',
+        },
+      ];
+      (mockedApi.get as jest.Mock).mockResolvedValueOnce(mockActivities);
+
+      await useCalendarStore.getState().fetchActivitiesForDate(new Date(2024, 0, 15));
+
+      const state = useCalendarStore.getState();
+      expect(state.activities).toEqual(mockActivities);
+      expect(state.isLoading).toBe(false);
+      expect(state.error).toBeNull();
+      expect(mockedApi.get).toHaveBeenCalledWith('/activities?date=2024-01-15');
+    });
+
+    it('sets error on API failure', async () => {
+      (mockedApi.get as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
+
+      await useCalendarStore.getState().fetchActivitiesForDate(new Date(2024, 0, 15));
+
+      const state = useCalendarStore.getState();
+      expect(state.error).toBe('Network error');
+      expect(state.isLoading).toBe(false);
+    });
+  });
+
+  describe('addActivity', () => {
+    it('posts to API and refetches activities', async () => {
+      // Use local midnight to avoid timezone issues with format()
+      useCalendarStore.setState({ selectedDate: new Date(2024, 0, 15) });
+      const newActivity = {
+        title: 'New Activity',
+        description: '',
+        date: '2024-01-15',
+        startTime: null,
+        duration: null,
+        recurrence: 'none' as const,
+        priority: null,
+      };
+      (mockedApi.post as jest.Mock).mockResolvedValueOnce({ id: '1', ...newActivity });
+      (mockedApi.get as jest.Mock).mockResolvedValueOnce([{ id: '1', ...newActivity, completed: false, attachments: [], createdAt: '', updatedAt: '' }]);
+
+      await useCalendarStore.getState().addActivity(newActivity);
+
+      expect(mockedApi.post).toHaveBeenCalledWith('/activities', newActivity);
+      expect(mockedApi.get).toHaveBeenCalledWith('/activities?date=2024-01-15');
+    });
+  });
+
+  describe('removeActivity', () => {
+    it('deletes via API and refetches', async () => {
+      useCalendarStore.setState({
+        selectedDate: new Date(2024, 0, 15),
+        activities: [{ id: '1', title: 'Test', description: '', completed: false, date: '2024-01-15', startTime: null, duration: null, recurrence: 'none', priority: null, attachments: [], createdAt: '', updatedAt: '' }],
+      });
+      (mockedApi.del as jest.Mock).mockResolvedValueOnce(undefined);
+      (mockedApi.get as jest.Mock).mockResolvedValueOnce([]);
+
+      await useCalendarStore.getState().removeActivity('1');
+
+      expect(mockedApi.del).toHaveBeenCalledWith('/activities/1');
+      expect(mockedApi.get).toHaveBeenCalledWith('/activities?date=2024-01-15');
+    });
+  });
+
+  describe('toggleActivity', () => {
+    it('patches toggle via API with date and refetches', async () => {
+      useCalendarStore.setState({
+        selectedDate: new Date(2024, 0, 15),
+        activities: [{ id: '1', title: 'Test', description: '', completed: false, date: '2024-01-15', startTime: null, duration: null, recurrence: 'none', priority: null, attachments: [], createdAt: '', updatedAt: '' }],
+      });
+      (mockedApi.patch as jest.Mock).mockResolvedValueOnce({});
+      (mockedApi.get as jest.Mock).mockResolvedValueOnce([]);
+
+      await useCalendarStore.getState().toggleActivity('1');
+
+      expect(mockedApi.patch).toHaveBeenCalledWith('/activities/1/toggle', { date: '2024-01-15' });
+      expect(mockedApi.get).toHaveBeenCalledWith('/activities?date=2024-01-15');
+    });
+  });
+
+  describe('updateActivity', () => {
+    it('puts to API and refetches', async () => {
+      useCalendarStore.setState({
+        selectedDate: new Date(2024, 0, 15),
+        activities: [{ id: '1', title: 'Test', description: '', completed: false, date: '2024-01-15', startTime: null, duration: null, recurrence: 'none', priority: null, attachments: [], createdAt: '', updatedAt: '' }],
+      });
+      (mockedApi.put as jest.Mock).mockResolvedValueOnce({});
+      (mockedApi.get as jest.Mock).mockResolvedValueOnce([{ id: '1', title: 'Updated', description: '', completed: false, date: '2024-01-15', startTime: null, duration: null, recurrence: 'none', priority: null, attachments: [], createdAt: '', updatedAt: '' }]);
+
+      await useCalendarStore.getState().updateActivity('1', { title: 'Updated' });
+
+      expect(mockedApi.put).toHaveBeenCalledWith('/activities/1', { title: 'Updated' });
+      expect(mockedApi.get).toHaveBeenCalledWith('/activities?date=2024-01-15');
     });
   });
 });

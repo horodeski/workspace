@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Textarea } from '@/components/ui/textarea';
@@ -17,7 +17,6 @@ import {
   BoardItemFormData,
   BoardItemType,
 } from '../types/board.types';
-import { validateImageFile } from '../services/imageValidation';
 
 export interface ItemFormProps {
   defaultValues?: { content: string; type: BoardItemType };
@@ -30,18 +29,11 @@ export const ItemForm: React.FC<ItemFormProps> = ({
   onSubmit,
   onCancel,
 }) => {
-  const [imageContent, setImageContent] = useState<string>(
-    defaultValues?.type === 'image' ? defaultValues.content : ''
-  );
-  const [imageError, setImageError] = useState<string>('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
   const {
     register,
     handleSubmit,
     control,
     watch,
-    setValue,
     formState: { errors },
   } = useForm<BoardItemFormData>({
     resolver: zodResolver(boardItemSchema),
@@ -49,38 +41,6 @@ export const ItemForm: React.FC<ItemFormProps> = ({
   });
 
   const selectedType = watch('type');
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setImageError('');
-
-    const validation = validateImageFile(file.type, file.size);
-    if (!validation.valid) {
-      setImageError(validation.error!);
-      e.target.value = '';
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      setImageContent(dataUrl);
-      setValue('content', dataUrl, { shouldValidate: true });
-    };
-    reader.onerror = () => {
-      setImageError('Failed to process image');
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const url = e.target.value;
-    setImageContent(url);
-    setValue('content', url, { shouldValidate: true });
-    setImageError('');
-  };
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
@@ -111,48 +71,21 @@ export const ItemForm: React.FC<ItemFormProps> = ({
       <div className="flex flex-col gap-2">
         <Label htmlFor="content">Conteúdo</Label>
         {selectedType === 'image' ? (
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-col gap-1">
-              <Label htmlFor="image-upload" className="text-sm font-normal">
-                Upload image
-              </Label>
-              <Input
-                id="image-upload"
-                ref={fileInputRef}
-                type="file"
-                accept="image/png,image/jpeg,image/gif,image/webp"
-                onChange={handleFileChange}
-              />
-            </div>
-
-            <p className="text-sm text-muted-foreground text-center">or</p>
-
-            <div className="flex flex-col gap-1">
-              <Label htmlFor="image-url" className="text-sm font-normal">
-                Or paste URL
-              </Label>
-              <Input
-                id="image-url"
-                type="url"
-                placeholder="https://example.com/image.png"
-                value={
-                  imageContent.startsWith('data:') ? '' : imageContent
-                }
-                onChange={handleUrlChange}
-              />
-            </div>
-
-            {imageError && (
-              <p className="text-sm text-destructive">{imageError}</p>
-            )}
-            {errors.content && !imageError && (
+          <div className="flex flex-col gap-1">
+            <Input
+              id="content"
+              type="text"
+              placeholder="https://example.com/image.png"
+              {...register('content')}
+            />
+            <p className="text-xs text-muted-foreground">
+              Cole a URL de uma imagem (PNG, JPEG, GIF, WebP)
+            </p>
+            {errors.content && (
               <p className="text-sm text-destructive">
                 {errors.content.message}
               </p>
             )}
-
-            {/* Hidden field to keep react-hook-form in sync */}
-            <input type="hidden" {...register('content')} />
           </div>
         ) : (
           <>

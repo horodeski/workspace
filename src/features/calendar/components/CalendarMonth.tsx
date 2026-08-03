@@ -10,6 +10,7 @@ import {
   startOfDay,
   endOfDay,
 } from 'date-fns';
+import { useEffect } from 'react';
 import { CalendarEventType, PriorityType } from '../types/calendar.types';
 import { useCalendarStore } from '../hooks/useCalendarStore';
 import { Badge } from '@/components/ui/badge';
@@ -35,9 +36,16 @@ function getPriorityBadgeVariant(priority: PriorityType | null, completed: boole
 export function CalendarMonth({ month, events }: CalendarMonthProps) {
   const selectedDate = useCalendarStore((state) => state.selectedDate);
   const setSelectedDate = useCalendarStore((state) => state.setSelectedDate);
-  // Subscribe to activities to re-render when they change
-  useCalendarStore((state) => state.activities);
-  const getActivitiesForDate = useCalendarStore((state) => state.getActivitiesForDate);
+  const monthActivities = useCalendarStore((state) => state.monthActivities);
+  const activities = useCalendarStore((state) => state.activities);
+  const fetchActivitiesForMonth = useCalendarStore((state) => (state as any).fetchActivitiesForMonth);
+
+  // Fetch activities for the entire month for calendar badges
+  useEffect(() => {
+    if (fetchActivitiesForMonth) {
+      fetchActivitiesForMonth(month);
+    }
+  }, [month, fetchActivitiesForMonth]);
 
   // Generate 42 cells (6 weeks × 7 days)
   const monthStart = startOfMonth(month);
@@ -51,6 +59,16 @@ export function CalendarMonth({ month, events }: CalendarMonthProps) {
       const eventStart = parseISO(event.startTime);
       const eventEnd = parseISO(event.endTime);
       return eventStart <= dayEnd && eventEnd >= dayStart;
+    });
+  };
+
+  const getActivitiesForDay = (day: Date) => {
+    const dateStr = format(day, 'yyyy-MM-dd');
+    // For the selected date, use sidebar activities; for others, use monthActivities
+    const source = isSameDay(day, selectedDate) ? activities : monthActivities;
+    return source.filter((a) => {
+      const actDate = (a as any).instanceDate || a.date;
+      return actDate === dateStr;
     });
   };
 
@@ -76,7 +94,7 @@ export function CalendarMonth({ month, events }: CalendarMonthProps) {
       <div className="grid grid-cols-7 flex-1 gap-px">
         {cells.map((day, i) => {
           const dayEvents = getEventsForDay(day);
-          const dayActivities = getActivitiesForDate(day);
+          const dayActivities = getActivitiesForDay(day);
           const inCurrentMonth = isSameMonth(day, month);
           const today = isToday(day);
           const isSelected = isSameDay(day, selectedDate);

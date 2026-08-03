@@ -9,14 +9,14 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
 } from '@/components/ui/context-menu';
-import { Board } from '../types/board.types';
+import type { BoardSummary } from '../hooks/useBoardModuleStore';
 
 export interface BoardBarProps {
-  boards: Board[];
+  boards: BoardSummary[];
   activeBoardId: string | null;
   onSelectBoard: (id: string) => void;
   onCreateBoard: () => void;
-  onRenameBoard: (id: string, newName: string) => { success: boolean; error?: string };
+  onRenameBoard: (id: string, newName: string) => Promise<{ success: boolean; error?: string }>;
   onDeleteBoard: (id: string) => void;
   onStartRename?: (id: string) => void;
   canDelete: boolean;
