@@ -1,0 +1,47 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: workspace
+      POSTGRES_PASSWORD: workspace_dev
+      POSTGRES_DB: workspace
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U workspace"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - workspace-network
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://workspace:workspace_dev@postgres:5432/workspace?schema=public
+    volumes:
+      - ./src:/app/src
+      - ./prisma:/app/prisma
+      - ./package.json:/app/package.json
+      - ./tsconfig.json:/app/tsconfig.json
+    command: sh -c "npx prisma generate && npx prisma db push && npx prisma db seed && npx tsx watch src/server.ts"
+    networks:
+      - workspace-network
+
+volumes:
+  postgres_data:
+
+networks:
+  workspace-network:
+    driver: bridge

@@ -1,0 +1,169 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String    @id @default(uuid())
+  email           String    @unique
+  passwordHash    String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  activities      Activity[]
+  supportEntries  SupportEntry[]
+  boards          Board[]
+  reviews         Review[]
+  refreshTokens   RefreshToken[]
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  token     String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([token])
+}
+
+model Activity {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String    @db.VarChar(200)
+  description String    @default("") @db.Text
+  date        String    @db.VarChar(10)
+  startTime   String?   @db.VarChar(5)
+  duration    Int?
+  recurrence  String    @default("none") @db.VarChar(10)
+  priority    String?   @db.VarChar(10)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  completions ActivityCompletion[]
+  attachments ActivityAttachment[]
+
+  @@index([userId])
+  @@index([date])
+  @@index([userId, date])
+}
+
+model ActivityCompletion {
+  id         String   @id @default(uuid())
+  activityId String
+  activity   Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  date       String   @db.VarChar(10)
+  completed  Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  @@unique([activityId, date])
+  @@index([activityId])
+}
+
+model ActivityAttachment {
+  id         String   @id @default(uuid())
+  activityId String
+  activity   Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  name       String   @db.VarChar(255)
+  mimeType   String   @db.VarChar(100)
+  size       Int
+  path       String   @db.VarChar(500)
+  createdAt  DateTime @default(now())
+
+  @@index([activityId])
+}
+
+model SupportEntry {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date        String    @db.VarChar(5)
+  description String    @db.VarChar(200)
+  duration    String    @db.VarChar(20)
+  observation String    @default("") @db.VarChar(300)
+  isFinalized Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  attachments SupportEntryAttachment[]
+
+  @@index([userId])
+  @@index([userId, isFinalized])
+}
+
+model SupportEntryAttachment {
+  id             String       @id @default(uuid())
+  supportEntryId String
+  supportEntry   SupportEntry @relation(fields: [supportEntryId], references: [id], onDelete: Cascade)
+  name           String       @db.VarChar(255)
+  mimeType       String       @db.VarChar(100)
+  size           Int
+  path           String       @db.VarChar(500)
+  createdAt      DateTime     @default(now())
+
+  @@index([supportEntryId])
+}
+
+model Board {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String    @db.VarChar(50)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  items BoardItem[]
+
+  @@index([userId])
+}
+
+model BoardItem {
+  id        String    @id @default(uuid())
+  boardId   String
+  board     Board     @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  content   String    @db.VarChar(500)
+  type      String    @db.VarChar(10)
+  positionX Int       @default(0)
+  positionY Int       @default(0)
+  width     Int       @default(240)
+  height    Int       @default(180)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([boardId])
+}
+
+model Review {
+  id               String    @id @default(uuid())
+  userId           String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weekNumber       Int
+  year             Int
+  startDate        String    @db.VarChar(10)
+  endDate          String    @db.VarChar(10)
+  learning         String    @default("") @db.Text
+  decisions        String    @default("") @db.Text
+  resolvedProblems String    @default("") @db.Text
+  timeWaste        String    @default("") @db.Text
+  nextWeekFocus    String    @default("") @db.Text
+  isLocked         Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deletedAt        DateTime?
+
+  @@unique([userId, weekNumber, year])
+  @@index([userId])
+  @@index([userId, year, weekNumber])
+}
