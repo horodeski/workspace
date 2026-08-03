@@ -24,7 +24,7 @@ export async function authMiddleware(request: FastifyRequest, _reply: FastifyRep
   const token = authHeader.substring(7); // Remove "Bearer "
 
   try {
-    const secret = (request.server as any).env.JWT_SECRET;
+    const secret = (request.server as unknown as { env: { JWT_SECRET: string } }).env.JWT_SECRET;
     const decoded = jwt.verify(token, secret) as JwtPayload;
     request.userId = decoded.userId;
   } catch (error) {

@@ -14,11 +14,11 @@ function createMockRequest(authHeader?: string) {
       env: { JWT_SECRET },
     },
     userId: '',
-  } as any;
+  } as unknown as Parameters<typeof authMiddleware>[0];
 }
 
 function createMockReply() {
-  return {} as any;
+  return {} as unknown as Parameters<typeof authMiddleware>[1];
 }
 
 describe('authMiddleware', () => {

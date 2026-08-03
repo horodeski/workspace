@@ -141,7 +141,7 @@ async function importActivity(
     createData.id = activity.id;
   }
 
-  await tx.activity.create({ data: createData as any });
+  await tx.activity.create({ data: createData as Parameters<typeof tx.activity.create>[0]['data'] });
   return true;
 }
 
@@ -169,7 +169,7 @@ async function importSupportEntry(
     createData.id = entry.id;
   }
 
-  await tx.supportEntry.create({ data: createData as any });
+  await tx.supportEntry.create({ data: createData as Parameters<typeof tx.supportEntry.create>[0]['data'] });
   return true;
 }
 
@@ -194,7 +194,7 @@ async function importBoard(
     boardData.id = board.id;
   }
 
-  const createdBoard = await tx.board.create({ data: boardData as any });
+  const createdBoard = await tx.board.create({ data: boardData as Parameters<typeof tx.board.create>[0]['data'] });
 
   // Import board items
   if (board.items && board.items.length > 0) {
@@ -217,7 +217,7 @@ async function importBoard(
         }
       }
 
-      await tx.boardItem.create({ data: itemData as any });
+      await tx.boardItem.create({ data: itemData as Parameters<typeof tx.boardItem.create>[0]['data'] });
     }
   }
 
@@ -268,7 +268,7 @@ async function importReview(
     createData.id = review.id;
   }
 
-  await tx.review.create({ data: createData as any });
+  await tx.review.create({ data: createData as Parameters<typeof tx.review.create>[0]['data'] });
   return true;
 }
 
@@ -362,7 +362,7 @@ async function processActivityOperation(
       const { id: _id, ...updateData } = data;
       await prisma.activity.update({
         where: { id: existing.id },
-        data: updateData as any,
+        data: updateData as Parameters<typeof prisma.activity.update>[0]['data'],
       });
       return {
         operationId: operation.id,
@@ -429,7 +429,7 @@ async function processSupportEntryOperation(
       const { id: _id, ...updateData } = data;
       await prisma.supportEntry.update({
         where: { id: existing.id },
-        data: updateData as any,
+        data: updateData as Parameters<typeof prisma.supportEntry.update>[0]['data'],
       });
       return {
         operationId: operation.id,
@@ -493,7 +493,7 @@ async function processBoardOperation(
       const { id: _id, ...updateData } = data;
       await prisma.board.update({
         where: { id: existing.id },
-        data: updateData as any,
+        data: updateData as Parameters<typeof prisma.board.update>[0]['data'],
       });
       return {
         operationId: operation.id,
@@ -571,7 +571,7 @@ async function processBoardItemOperation(
       const { id: _id, boardId: _boardId, ...updateData } = data;
       await prisma.boardItem.update({
         where: { id: item.id },
-        data: updateData as any,
+        data: updateData as Parameters<typeof prisma.boardItem.update>[0]['data'],
       });
       return {
         operationId: operation.id,
@@ -657,7 +657,7 @@ async function processReviewOperation(
       const { id: _id, ...updateData } = data;
       await prisma.review.update({
         where: { id: existing.id },
-        data: updateData as any,
+        data: updateData as Parameters<typeof prisma.review.update>[0]['data'],
       });
       return {
         operationId: operation.id,

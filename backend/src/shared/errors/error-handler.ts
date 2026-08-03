@@ -22,11 +22,12 @@ export function errorHandler(
   }
 
   // Handle Fastify errors with statusCode (e.g., rate-limit 429, payload too large 413)
-  if ('statusCode' in error && typeof (error as any).statusCode === 'number' && (error as any).statusCode !== 500) {
-    const statusCode = (error as any).statusCode as number;
+  const errorWithStatus = error as unknown as Record<string, unknown>;
+  if ('statusCode' in error && typeof errorWithStatus.statusCode === 'number' && errorWithStatus.statusCode !== 500) {
+    const statusCode = errorWithStatus.statusCode;
     const response: ErrorResponse = {
       statusCode,
-      error: (error as any).error || error.message || 'Error',
+      error: (typeof errorWithStatus.error === 'string' ? errorWithStatus.error : error.message) || 'Error',
       message: error.message || 'Erro na requisição',
     };
     reply.status(statusCode).send(response);
@@ -51,13 +52,13 @@ export function errorHandler(
   }
 
   // Handle Fastify validation errors (from schema validation)
-  if ('validation' in error && Array.isArray((error as any).validation)) {
-    const validation = (error as any).validation as Array<{
+  if ('validation' in error && Array.isArray((error as unknown as Record<string, unknown>).validation)) {
+    const validation = (error as unknown as { validation: Array<{
       instancePath?: string;
       params?: { missingProperty?: string };
       message?: string;
       keyword?: string;
-    }>;
+    }> }).validation;
     const details: ValidationDetail[] = validation.map((v) => ({
       path: v.instancePath?.replace(/^\//, '').replace(/\//g, '.') || v.params?.missingProperty || '',
       message: v.message || 'Valor inválido',

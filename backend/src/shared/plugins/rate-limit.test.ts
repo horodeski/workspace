@@ -102,7 +102,7 @@ describe('apiRateLimitPlugin', () => {
     app.decorate('env', createTestEnv());
     // Simulate auth middleware attaching userId
     app.addHook('onRequest', async (req) => {
-      (req as any).userId = 'user-123';
+      (req as unknown as { userId: string }).userId = 'user-123';
     });
     await app.register(apiRateLimitPlugin);
     app.get('/test', async () => ({ ok: true }));
@@ -122,7 +122,7 @@ describe('apiRateLimitPlugin', () => {
     app.decorate('env', createTestEnv({ RATE_LIMIT_API: 2 }));
     // Simulate auth middleware attaching userId before rate limit
     app.addHook('onRequest', async (req) => {
-      (req as any).userId = 'user-456';
+      (req as unknown as { userId: string }).userId = 'user-456';
     });
     await app.register(apiRateLimitPlugin);
     app.get('/test', async () => ({ ok: true }));
@@ -152,7 +152,7 @@ describe('apiRateLimitPlugin', () => {
 
     let currentUserId = 'user-A';
     app.addHook('onRequest', async (req) => {
-      (req as any).userId = currentUserId;
+      (req as unknown as { userId: string }).userId = currentUserId;
     });
     await app.register(apiRateLimitPlugin);
     app.get('/test', async () => ({ ok: true }));

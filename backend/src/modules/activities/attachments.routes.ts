@@ -24,7 +24,7 @@ export const activityAttachmentsRoutes: FastifyPluginAsync = async (app: Fastify
   // POST /:id/attachments — Upload file attachment
   app.post('/:id/attachments', async (request, reply) => {
     const { id } = request.params as { id: string };
-    const uploadDir = (request.server as any).env.UPLOAD_DIR as string;
+    const uploadDir = (request.server as unknown as { env: { UPLOAD_DIR: string } }).env.UPLOAD_DIR;
 
     // Verify activity belongs to authenticated user
     const activity = await prisma.activity.findFirst({

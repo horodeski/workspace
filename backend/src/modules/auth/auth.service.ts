@@ -35,9 +35,9 @@ async function register(email: string, password: string, _deps: AuthServiceDeps)
   let user;
   try {
     user = await authRepository.createUser({ email, passwordHash });
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Prisma unique constraint violation (P2002)
-    if (error?.code === 'P2002') {
+    if (error && typeof error === 'object' && 'code' in error && (error as { code: string }).code === 'P2002') {
       throw new ConflictError('Email já cadastrado');
     }
     throw error;

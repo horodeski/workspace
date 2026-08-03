@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { existsSync } from 'node:fs';
-import { rm, readFile, mkdir, writeFile } from 'node:fs/promises';
+import { rm, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
@@ -21,7 +21,7 @@ function createMockMultipartFile(options: {
     filename: options.filename,
     mimetype: options.mimetype,
     toBuffer: async () => options.data,
-  } as any;
+  } as unknown as Parameters<typeof saveFile>[0];
 }
 
 describe('storage', () => {

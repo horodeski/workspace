@@ -4,8 +4,14 @@ import { errorHandler } from './error-handler.js';
 import { AppError } from './app-error.js';
 import { NotFoundError, ValidationError } from './errors.js';
 
-function createMockReply() {
-  const reply: any = {
+interface MockReply {
+  statusCode: number;
+  status(code: number): MockReply;
+  send: ReturnType<typeof vi.fn>;
+}
+
+function createMockReply(): MockReply {
+  const reply: MockReply = {
     statusCode: 200,
     status(code: number) {
       reply.statusCode = code;
@@ -21,7 +27,7 @@ function createMockRequest() {
     log: {
       error: vi.fn(),
     },
-  } as any;
+  } as unknown as Parameters<typeof errorHandler>[1];
 }
 
 describe('errorHandler', () => {
@@ -30,7 +36,7 @@ describe('errorHandler', () => {
     const reply = createMockReply();
     const error = new AppError(400, 'Bad Request', 'Invalid input');
 
-    errorHandler(error as any, request, reply);
+    errorHandler(error as unknown as Parameters<typeof errorHandler>[0], request, reply as unknown as Parameters<typeof errorHandler>[2]);
 
     expect(reply.statusCode).toBe(400);
     expect(reply.send).toHaveBeenCalledWith({
@@ -46,7 +52,7 @@ describe('errorHandler', () => {
     const details = [{ path: 'email', message: 'Invalid', code: 'invalid_string' }];
     const error = new ValidationError(details);
 
-    errorHandler(error as any, request, reply);
+    errorHandler(error as unknown as Parameters<typeof errorHandler>[0], request, reply as unknown as Parameters<typeof errorHandler>[2]);
 
     expect(reply.statusCode).toBe(400);
     expect(reply.send).toHaveBeenCalledWith({
@@ -62,7 +68,7 @@ describe('errorHandler', () => {
     const reply = createMockReply();
     const error = new NotFoundError('Atividade');
 
-    errorHandler(error as any, request, reply);
+    errorHandler(error as unknown as Parameters<typeof errorHandler>[0], request, reply as unknown as Parameters<typeof errorHandler>[2]);
 
     expect(reply.statusCode).toBe(404);
     expect(reply.send).toHaveBeenCalledWith({
@@ -93,7 +99,7 @@ describe('errorHandler', () => {
       },
     ]);
 
-    errorHandler(zodError as any, request, reply);
+    errorHandler(zodError as unknown as Parameters<typeof errorHandler>[0], request, reply as unknown as Parameters<typeof errorHandler>[2]);
 
     expect(reply.statusCode).toBe(400);
     expect(reply.send).toHaveBeenCalledWith({
@@ -117,7 +123,7 @@ describe('errorHandler', () => {
       ],
     });
 
-    errorHandler(error as any, request, reply);
+    errorHandler(error as unknown as Parameters<typeof errorHandler>[0], request, reply as unknown as Parameters<typeof errorHandler>[2]);
 
     expect(reply.statusCode).toBe(400);
     expect(reply.send).toHaveBeenCalledWith({
@@ -136,7 +142,7 @@ describe('errorHandler', () => {
     const reply = createMockReply();
     const error = new Error('Something unexpected happened');
 
-    errorHandler(error as any, request, reply);
+    errorHandler(error as unknown as Parameters<typeof errorHandler>[0], request, reply as unknown as Parameters<typeof errorHandler>[2]);
 
     expect(reply.statusCode).toBe(500);
     expect(reply.send).toHaveBeenCalledWith({
@@ -155,7 +161,7 @@ describe('errorHandler', () => {
     const reply = createMockReply();
     const error = new Error('Database connection failed');
 
-    errorHandler(error as any, request, reply);
+    errorHandler(error as unknown as Parameters<typeof errorHandler>[0], request, reply as unknown as Parameters<typeof errorHandler>[2]);
 
     const sentResponse = reply.send.mock.calls[0][0];
     expect(sentResponse).not.toHaveProperty('stack');

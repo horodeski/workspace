@@ -69,7 +69,7 @@ describe('envSchema', () => {
   });
 
   it('rejects missing DATABASE_URL', () => {
-    const { DATABASE_URL, ...withoutDb } = validEnv;
+    const { DATABASE_URL: _DATABASE_URL, ...withoutDb } = validEnv;
     const result = envSchema.safeParse(withoutDb);
     expect(result.success).toBe(false);
   });

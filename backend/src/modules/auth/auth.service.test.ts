@@ -60,8 +60,7 @@ describe('authService', () => {
     });
 
     it('should throw ConflictError on duplicate email (P2002)', async () => {
-      const prismaError = new Error('Unique constraint violation');
-      (prismaError as any).code = 'P2002';
+      const prismaError = Object.assign(new Error('Unique constraint violation'), { code: 'P2002' });
       vi.mocked(authRepository.createUser).mockRejectedValue(prismaError);
 
       await expect(
@@ -149,7 +148,7 @@ describe('authService', () => {
       expect(result.refreshToken).toBeDefined();
 
       // Verify access token contains userId
-      const decoded = jwt.verify(result.accessToken, deps.jwtSecret) as any;
+      const decoded = jwt.verify(result.accessToken, deps.jwtSecret) as { userId: string };
       expect(decoded.userId).toBe('user-456');
 
       // Verify refresh token stored in DB
@@ -223,7 +222,7 @@ describe('authService', () => {
       );
 
       // New access token should contain userId
-      const decoded = jwt.verify(result.accessToken, deps.jwtSecret) as any;
+      const decoded = jwt.verify(result.accessToken, deps.jwtSecret) as { userId: string };
       expect(decoded.userId).toBe(userId);
     });
 

@@ -13,17 +13,20 @@ export type DomainEvent =
 
 export type DomainEventHandler<T extends DomainEvent = DomainEvent> = (event: T) => Promise<void> | void;
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type EventHandler = (...args: any[]) => unknown;
+
 export interface IEventBus {
   publish(event: DomainEvent): void;
   subscribe<T extends DomainEvent['type']>(
     type: T,
     handler: (event: Extract<DomainEvent, { type: T }>) => Promise<void> | void
   ): void;
-  unsubscribe(type: DomainEvent['type'], handler: Function): void;
+  unsubscribe(type: DomainEvent['type'], handler: EventHandler): void;
 }
 
 export class EventBus implements IEventBus {
-  private handlers: Map<string, Set<Function>> = new Map();
+  private handlers: Map<string, Set<EventHandler>> = new Map();
 
   publish(event: DomainEvent): void {
     const subscribers = this.handlers.get(event.type);
@@ -67,7 +70,7 @@ export class EventBus implements IEventBus {
     }
   }
 
-  unsubscribe(type: DomainEvent['type'], handler: Function): void {
+  unsubscribe(type: DomainEvent['type'], handler: EventHandler): void {
     const subscribers = this.handlers.get(type);
     if (subscribers) {
       subscribers.delete(handler);
