@@ -1,0 +1,125 @@
+name: 🐞 Bug
+description: Reporte um problema encontrado no sistema
+title: "[BUG] "
+labels:
+  - bug
+
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: 📋 Resumo
+      description: Descreva o problema encontrado.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: 🚨 Severidade
+      options:
+        - Critical
+        - High
+        - Medium
+        - Low
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: 🌎 Ambiente
+      value: |
+        Sistema:
+        Navegador:
+        Versão:
+        API:
+        Banco:
+
+  - type: textarea
+    id: location
+    attributes:
+      label: 📍 Localização
+      value: |
+        Módulo:
+        Tela:
+        Endpoint:
+        Componente:
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 🔁 Passos para Reproduzir
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: ✔ Resultado Esperado
+    validations:
+      required: true
+
+  - type: textarea
+    id: current
+    attributes:
+      label: ❌ Resultado Atual
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 📸 Evidências
+      description: Prints, logs, vídeos ou outras evidências.
+
+  - type: textarea
+    id: cause
+    attributes:
+      label: 🔍 Possível Causa
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: 💡 Solução Esperada
+
+  - type: textarea
+    id: tests
+    attributes:
+      label: 🧪 Casos de Teste
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: 📊 Impacto
+      value: |
+        Usuários afetados:
+        Processos afetados:
+        APIs afetadas:
+        Banco afetado:
+
+  - type: checkboxes
+    id: security
+    attributes:
+      label: 🔒 Segurança
+      options:
+        - label: SQL Injection
+        - label: XSS
+        - label: CSRF
+        - label: Broken Access Control
+        - label: Nenhum
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: ✔ Checklist
+      options:
+        - label: Corrigido
+        - label: Testado
+        - label: Revisado
+        - label: Regressão executada
+        - label: Logs validados
