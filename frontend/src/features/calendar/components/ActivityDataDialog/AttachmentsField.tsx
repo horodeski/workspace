@@ -1,8 +1,14 @@
-import { Paperclip, Trash2, Download } from 'lucide-react';
+import { FileText, Image, File, Paperclip, Trash2, Download } from 'lucide-react';
 import { Button } from '@/components/Button';
 import { Label } from '@/components/ui/label';
 import { ActivityAttachment } from '../../types/calendar.types';
-import { getFileIcon, formatFileSize } from './constants';
+import { formatFileSize } from './constants';
+
+function getFileIcon(type: string) {
+  if (type.startsWith('image/')) return <Image className="w-4 h-4 text-blue-400" />;
+  if (type.includes('pdf') || type.includes('document')) return <FileText className="w-4 h-4 text-red-400" />;
+  return <File className="w-4 h-4 text-zinc-400" />;
+}
 
 interface AttachmentsFieldProps {
   attachments: ActivityAttachment[];

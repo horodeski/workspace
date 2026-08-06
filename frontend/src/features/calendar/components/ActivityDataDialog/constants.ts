@@ -1,4 +1,3 @@
-import { FileText, Image, File } from 'lucide-react';
 import { RecurrenceType, PriorityType } from '../../types/calendar.types';
 
 export const RECURRENCE_OPTIONS: { value: RecurrenceType; label: string }[] = [
@@ -23,12 +22,6 @@ export function formatDuration(minutes: number): string {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   return m > 0 ? `${h}h ${m}min` : `${h}h`;
-}
-
-export function getFileIcon(type: string) {
-  if (type.startsWith('image/')) return <Image className="w-4 h-4 text-blue-400" />;
-  if (type.includes('pdf') || type.includes('document')) return <FileText className="w-4 h-4 text-red-400" />;
-  return <File className="w-4 h-4 text-zinc-400" />;
 }
 
 export function formatFileSize(bytes: number): string {
