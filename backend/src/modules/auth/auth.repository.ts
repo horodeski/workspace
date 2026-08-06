@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { prisma } from '../../shared/database/prisma.js';
 
 export interface CreateUserData {
@@ -22,6 +23,14 @@ export interface RefreshTokenRecord {
   createdAt: Date;
 }
 
+/**
+ * Hash a refresh token with SHA-256 before storing/querying.
+ * This ensures that a DB leak does not expose usable tokens (SEC-005).
+ */
+export function hashToken(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
 export const authRepository = {
   async findUserByEmail(email: string): Promise<UserRecord | null> {
     return prisma.user.findUnique({ where: { email } });
@@ -36,11 +45,15 @@ export const authRepository = {
   },
 
   async findRefreshToken(token: string): Promise<RefreshTokenRecord | null> {
-    return prisma.refreshToken.findUnique({ where: { token } });
+    const tokenHash = hashToken(token);
+    return prisma.refreshToken.findUnique({ where: { token: tokenHash } });
   },
 
   async createRefreshToken(data: { token: string; userId: string; expiresAt: Date }): Promise<RefreshTokenRecord> {
-    return prisma.refreshToken.create({ data });
+    const tokenHash = hashToken(data.token);
+    return prisma.refreshToken.create({
+      data: { token: tokenHash, userId: data.userId, expiresAt: data.expiresAt },
+    });
   },
 
   async revokeRefreshToken(id: string): Promise<void> {

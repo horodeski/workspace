@@ -7,6 +7,23 @@ import type {
   ReviewImport,
   OfflineOperation,
 } from './sync.schemas.js';
+import {
+  activityCreateDataSchema,
+  activityUpdateDataSchema,
+  activityDeleteDataSchema,
+  supportEntryCreateDataSchema,
+  supportEntryUpdateDataSchema,
+  supportEntryDeleteDataSchema,
+  boardCreateDataSchema,
+  boardUpdateDataSchema,
+  boardDeleteDataSchema,
+  boardItemCreateDataSchema,
+  boardItemUpdateDataSchema,
+  boardItemDeleteDataSchema,
+  reviewCreateDataSchema,
+  reviewUpdateDataSchema,
+  reviewDeleteDataSchema,
+} from './sync.schemas.js';
 
 export interface ImportResult {
   activities: { imported: number; skipped: number };
@@ -47,44 +64,28 @@ export const syncService = {
     };
 
     await prisma.$transaction(async (tx) => {
-      // Import activities
       for (const activity of data.activities) {
         const imported = await importActivity(tx, userId, activity);
-        if (imported) {
-          result.activities.imported++;
-        } else {
-          result.activities.skipped++;
-        }
+        if (imported) result.activities.imported++;
+        else result.activities.skipped++;
       }
 
-      // Import support entries
       for (const entry of data.supportEntries) {
         const imported = await importSupportEntry(tx, userId, entry);
-        if (imported) {
-          result.supportEntries.imported++;
-        } else {
-          result.supportEntries.skipped++;
-        }
+        if (imported) result.supportEntries.imported++;
+        else result.supportEntries.skipped++;
       }
 
-      // Import boards (with items)
       for (const board of data.boards) {
         const imported = await importBoard(tx, userId, board);
-        if (imported) {
-          result.boards.imported++;
-        } else {
-          result.boards.skipped++;
-        }
+        if (imported) result.boards.imported++;
+        else result.boards.skipped++;
       }
 
-      // Import reviews
       for (const review of data.reviews) {
         const imported = await importReview(tx, userId, review);
-        if (imported) {
-          result.reviews.imported++;
-        } else {
-          result.reviews.skipped++;
-        }
+        if (imported) result.reviews.imported++;
+        else result.reviews.skipped++;
       }
     });
 
@@ -118,12 +119,9 @@ async function importActivity(
   userId: string,
   activity: ActivityImport
 ): Promise<boolean> {
-  // If ID is provided and valid, check if it already exists
   if (isValidUuid(activity.id)) {
     const existing = await tx.activity.findUnique({ where: { id: activity.id } });
-    if (existing) {
-      return false; // Skip — ID already in use
-    }
+    if (existing) return false;
   }
 
   const createData: Record<string, unknown> = {
@@ -152,9 +150,7 @@ async function importSupportEntry(
 ): Promise<boolean> {
   if (isValidUuid(entry.id)) {
     const existing = await tx.supportEntry.findUnique({ where: { id: entry.id } });
-    if (existing) {
-      return false;
-    }
+    if (existing) return false;
   }
 
   const createData: Record<string, unknown> = {
@@ -180,9 +176,7 @@ async function importBoard(
 ): Promise<boolean> {
   if (isValidUuid(board.id)) {
     const existing = await tx.board.findUnique({ where: { id: board.id } });
-    if (existing) {
-      return false;
-    }
+    if (existing) return false;
   }
 
   const boardData: Record<string, unknown> = {
@@ -196,7 +190,6 @@ async function importBoard(
 
   const createdBoard = await tx.board.create({ data: boardData as Parameters<typeof tx.board.create>[0]['data'] });
 
-  // Import board items
   if (board.items && board.items.length > 0) {
     for (const item of board.items) {
       const itemData: Record<string, unknown> = {
@@ -210,7 +203,6 @@ async function importBoard(
       };
 
       if (isValidUuid(item.id)) {
-        // Check item ID doesn't already exist
         const existingItem = await tx.boardItem.findUnique({ where: { id: item.id } });
         if (!existingItem) {
           itemData.id = item.id;
@@ -231,12 +223,9 @@ async function importReview(
 ): Promise<boolean> {
   if (isValidUuid(review.id)) {
     const existing = await tx.review.findUnique({ where: { id: review.id } });
-    if (existing) {
-      return false;
-    }
+    if (existing) return false;
   }
 
-  // Also check for existing review for the same week/year (unique constraint)
   const existingByWeek = await tx.review.findFirst({
     where: {
       userId,
@@ -246,9 +235,7 @@ async function importReview(
     },
   });
 
-  if (existingByWeek) {
-    return false;
-  }
+  if (existingByWeek) return false;
 
   const createData: Record<string, unknown> = {
     userId,
@@ -272,13 +259,10 @@ async function importReview(
   return true;
 }
 
-// --- Offline push operation processing ---
+// ============================================================
+// Offline push operation processing — with strict allowlists
+// ============================================================
 
-/**
- * Process a single offline operation using last-write-wins strategy.
- * If the entity was modified after the operation's timestamp, the operation
- * is reported as a conflict but still applied (last-write-wins).
- */
 async function processOfflineOperation(
   userId: string,
   operation: OfflineOperation
@@ -313,10 +297,6 @@ async function processOfflineOperation(
   }
 }
 
-/**
- * Determine if a conflict exists (entity updated after the operation timestamp).
- * With last-write-wins, we still apply the operation but report the conflict.
- */
 function hasConflict(entityUpdatedAt: Date, operationTimestamp: Date): boolean {
   return entityUpdatedAt > operationTimestamp;
 }
@@ -326,43 +306,53 @@ async function processActivityOperation(
   operation: OfflineOperation,
   operationTime: Date
 ): Promise<PushOperationResult> {
-  const data = operation.data as Record<string, unknown> | undefined;
-
   switch (operation.action) {
     case 'create': {
-      if (!data) {
-        return { operationId: operation.id, status: 'error', message: 'Dados ausentes para criação' };
+      const parsed = activityCreateDataSchema.safeParse(operation.data);
+      if (!parsed.success) {
+        return { operationId: operation.id, status: 'error', message: parsed.error.issues[0]?.message ?? 'Dados inválidos' };
       }
+      const data = parsed.data;
       await prisma.activity.create({
         data: {
-          id: (data.id as string) || undefined,
+          id: data.id || undefined,
           userId,
-          title: (data.title as string) ?? '',
-          description: (data.description as string) ?? '',
-          date: (data.date as string) ?? '',
-          startTime: (data.startTime as string) ?? null,
-          duration: (data.duration as number) ?? null,
-          recurrence: (data.recurrence as string) ?? 'none',
-          priority: (data.priority as string) ?? null,
+          title: data.title,
+          description: data.description,
+          date: data.date,
+          startTime: data.startTime,
+          duration: data.duration,
+          recurrence: data.recurrence,
+          priority: data.priority,
         },
       });
       return { operationId: operation.id, status: 'applied' };
     }
     case 'update': {
-      if (!data || !data.id) {
-        return { operationId: operation.id, status: 'error', message: 'ID ausente para atualização' };
+      const parsed = activityUpdateDataSchema.safeParse(operation.data);
+      if (!parsed.success) {
+        return { operationId: operation.id, status: 'error', message: parsed.error.issues[0]?.message ?? 'Dados inválidos' };
       }
+      const data = parsed.data;
       const existing = await prisma.activity.findFirst({
-        where: { id: data.id as string, userId, deletedAt: null },
+        where: { id: data.id, userId, deletedAt: null },
       });
       if (!existing) {
         return { operationId: operation.id, status: 'skipped', message: 'Atividade não encontrada' };
       }
       const conflict = hasConflict(existing.updatedAt, operationTime);
-      const { id: _id, ...updateData } = data;
+      // Allowlist: only client-editable fields
       await prisma.activity.update({
         where: { id: existing.id },
-        data: updateData as Parameters<typeof prisma.activity.update>[0]['data'],
+        data: {
+          ...(data.title !== undefined && { title: data.title }),
+          ...(data.description !== undefined && { description: data.description }),
+          ...(data.date !== undefined && { date: data.date }),
+          ...(data.startTime !== undefined && { startTime: data.startTime }),
+          ...(data.duration !== undefined && { duration: data.duration }),
+          ...(data.recurrence !== undefined && { recurrence: data.recurrence }),
+          ...(data.priority !== undefined && { priority: data.priority }),
+        },
       });
       return {
         operationId: operation.id,
@@ -371,11 +361,12 @@ async function processActivityOperation(
       };
     }
     case 'delete': {
-      if (!data || !data.id) {
-        return { operationId: operation.id, status: 'error', message: 'ID ausente para exclusão' };
+      const parsed = activityDeleteDataSchema.safeParse(operation.data);
+      if (!parsed.success) {
+        return { operationId: operation.id, status: 'error', message: parsed.error.issues[0]?.message ?? 'Dados inválidos' };
       }
       const existing = await prisma.activity.findFirst({
-        where: { id: data.id as string, userId, deletedAt: null },
+        where: { id: parsed.data.id, userId, deletedAt: null },
       });
       if (!existing) {
         return { operationId: operation.id, status: 'skipped', message: 'Atividade não encontrada' };
@@ -396,40 +387,46 @@ async function processSupportEntryOperation(
   operation: OfflineOperation,
   operationTime: Date
 ): Promise<PushOperationResult> {
-  const data = operation.data as Record<string, unknown> | undefined;
-
   switch (operation.action) {
     case 'create': {
-      if (!data) {
-        return { operationId: operation.id, status: 'error', message: 'Dados ausentes para criação' };
+      const parsed = supportEntryCreateDataSchema.safeParse(operation.data);
+      if (!parsed.success) {
+        return { operationId: operation.id, status: 'error', message: parsed.error.issues[0]?.message ?? 'Dados inválidos' };
       }
+      const data = parsed.data;
       await prisma.supportEntry.create({
         data: {
-          id: (data.id as string) || undefined,
+          id: data.id || undefined,
           userId,
-          date: (data.date as string) ?? '',
-          description: (data.description as string) ?? '',
-          duration: (data.duration as string) ?? '',
-          observation: (data.observation as string) ?? '',
+          date: data.date,
+          description: data.description,
+          duration: data.duration,
+          observation: data.observation,
         },
       });
       return { operationId: operation.id, status: 'applied' };
     }
     case 'update': {
-      if (!data || !data.id) {
-        return { operationId: operation.id, status: 'error', message: 'ID ausente para atualização' };
+      const parsed = supportEntryUpdateDataSchema.safeParse(operation.data);
+      if (!parsed.success) {
+        return { operationId: operation.id, status: 'error', message: parsed.error.issues[0]?.message ?? 'Dados inválidos' };
       }
+      const data = parsed.data;
       const existing = await prisma.supportEntry.findFirst({
-        where: { id: data.id as string, userId, deletedAt: null },
+        where: { id: data.id, userId, deletedAt: null },
       });
       if (!existing) {
         return { operationId: operation.id, status: 'skipped', message: 'Entrada não encontrada' };
       }
       const conflict = hasConflict(existing.updatedAt, operationTime);
-      const { id: _id, ...updateData } = data;
       await prisma.supportEntry.update({
         where: { id: existing.id },
-        data: updateData as Parameters<typeof prisma.supportEntry.update>[0]['data'],
+        data: {
+          ...(data.date !== undefined && { date: data.date }),
+          ...(data.description !== undefined && { description: data.description }),
+          ...(data.duration !== undefined && { duration: data.duration }),
+          ...(data.observation !== undefined && { observation: data.observation }),
+        },
       });
       return {
         operationId: operation.id,
@@ -438,11 +435,12 @@ async function processSupportEntryOperation(
       };
     }
     case 'delete': {
-      if (!data || !data.id) {
-        return { operationId: operation.id, status: 'error', message: 'ID ausente para exclusão' };
+      const parsed = supportEntryDeleteDataSchema.safeParse(operation.data);
+      if (!parsed.success) {
+        return { operationId: operation.id, status: 'error', message: parsed.error.issues[0]?.message ?? 'Dados inválidos' };
       }
       const existing = await prisma.supportEntry.findFirst({
-        where: { id: data.id as string, userId, deletedAt: null },
+        where: { id: parsed.data.id, userId, deletedAt: null },
       });
       if (!existing) {
         return { operationId: operation.id, status: 'skipped', message: 'Entrada não encontrada' };
@@ -463,37 +461,40 @@ async function processBoardOperation(
   operation: OfflineOperation,
   operationTime: Date
 ): Promise<PushOperationResult> {
-  const data = operation.data as Record<string, unknown> | undefined;
-
   switch (operation.action) {
     case 'create': {
-      if (!data) {
-        return { operationId: operation.id, status: 'error', message: 'Dados ausentes para criação' };
+      const parsed = boardCreateDataSchema.safeParse(operation.data);
+      if (!parsed.success) {
+        return { operationId: operation.id, status: 'error', message: parsed.error.issues[0]?.message ?? 'Dados inválidos' };
       }
+      const data = parsed.data;
       await prisma.board.create({
         data: {
-          id: (data.id as string) || undefined,
+          id: data.id || undefined,
           userId,
-          name: (data.name as string) ?? 'Novo Quadro',
+          name: data.name,
         },
       });
       return { operationId: operation.id, status: 'applied' };
     }
     case 'update': {
-      if (!data || !data.id) {
-        return { operationId: operation.id, status: 'error', message: 'ID ausente para atualização' };
+      const parsed = boardUpdateDataSchema.safeParse(operation.data);
+      if (!parsed.success) {
+        return { operationId: operation.id, status: 'error', message: parsed.error.issues[0]?.message ?? 'Dados inválidos' };
       }
+      const data = parsed.data;
       const existing = await prisma.board.findFirst({
-        where: { id: data.id as string, userId, deletedAt: null },
+        where: { id: data.id, userId, deletedAt: null },
       });
       if (!existing) {
         return { operationId: operation.id, status: 'skipped', message: 'Quadro não encontrado' };
       }
       const conflict = hasConflict(existing.updatedAt, operationTime);
-      const { id: _id, ...updateData } = data;
       await prisma.board.update({
         where: { id: existing.id },
-        data: updateData as Parameters<typeof prisma.board.update>[0]['data'],
+        data: {
+          ...(data.name !== undefined && { name: data.name }),
+        },
       });
       return {
         operationId: operation.id,
@@ -502,11 +503,12 @@ async function processBoardOperation(
       };
     }
     case 'delete': {
-      if (!data || !data.id) {
-        return { operationId: operation.id, status: 'error', message: 'ID ausente para exclusão' };
+      const parsed = boardDeleteDataSchema.safeParse(operation.data);
+      if (!parsed.success) {
+        return { operationId: operation.id, status: 'error', message: parsed.error.issues[0]?.message ?? 'Dados inválidos' };
       }
       const existing = await prisma.board.findFirst({
-        where: { id: data.id as string, userId, deletedAt: null },
+        where: { id: parsed.data.id, userId, deletedAt: null },
       });
       if (!existing) {
         return { operationId: operation.id, status: 'skipped', message: 'Quadro não encontrado' };
@@ -527,51 +529,58 @@ async function processBoardItemOperation(
   operation: OfflineOperation,
   operationTime: Date
 ): Promise<PushOperationResult> {
-  const data = operation.data as Record<string, unknown> | undefined;
-
   switch (operation.action) {
     case 'create': {
-      if (!data || !data.boardId) {
-        return { operationId: operation.id, status: 'error', message: 'boardId ausente para criação' };
+      const parsed = boardItemCreateDataSchema.safeParse(operation.data);
+      if (!parsed.success) {
+        return { operationId: operation.id, status: 'error', message: parsed.error.issues[0]?.message ?? 'Dados inválidos' };
       }
+      const data = parsed.data;
       // Verify board ownership
       const board = await prisma.board.findFirst({
-        where: { id: data.boardId as string, userId, deletedAt: null },
+        where: { id: data.boardId, userId, deletedAt: null },
       });
       if (!board) {
         return { operationId: operation.id, status: 'skipped', message: 'Quadro não encontrado' };
       }
       await prisma.boardItem.create({
         data: {
-          id: (data.id as string) || undefined,
+          id: data.id || undefined,
           boardId: board.id,
-          content: (data.content as string) ?? '',
-          type: (data.type as string) ?? 'note',
-          positionX: (data.positionX as number) ?? 0,
-          positionY: (data.positionY as number) ?? 0,
-          width: (data.width as number) ?? 240,
-          height: (data.height as number) ?? 180,
+          content: data.content,
+          type: data.type,
+          positionX: data.positionX,
+          positionY: data.positionY,
+          width: data.width,
+          height: data.height,
         },
       });
       return { operationId: operation.id, status: 'applied' };
     }
     case 'update': {
-      if (!data || !data.id) {
-        return { operationId: operation.id, status: 'error', message: 'ID ausente para atualização' };
+      const parsed = boardItemUpdateDataSchema.safeParse(operation.data);
+      if (!parsed.success) {
+        return { operationId: operation.id, status: 'error', message: parsed.error.issues[0]?.message ?? 'Dados inválidos' };
       }
-      // Verify the item belongs to a board owned by the user
+      const data = parsed.data;
       const item = await prisma.boardItem.findFirst({
-        where: { id: data.id as string, deletedAt: null },
+        where: { id: data.id, deletedAt: null },
         include: { board: true },
       });
       if (!item || item.board.userId !== userId || item.board.deletedAt !== null) {
         return { operationId: operation.id, status: 'skipped', message: 'Item não encontrado' };
       }
       const conflict = hasConflict(item.updatedAt, operationTime);
-      const { id: _id, boardId: _boardId, ...updateData } = data;
       await prisma.boardItem.update({
         where: { id: item.id },
-        data: updateData as Parameters<typeof prisma.boardItem.update>[0]['data'],
+        data: {
+          ...(data.content !== undefined && { content: data.content }),
+          ...(data.type !== undefined && { type: data.type }),
+          ...(data.positionX !== undefined && { positionX: data.positionX }),
+          ...(data.positionY !== undefined && { positionY: data.positionY }),
+          ...(data.width !== undefined && { width: data.width }),
+          ...(data.height !== undefined && { height: data.height }),
+        },
       });
       return {
         operationId: operation.id,
@@ -580,11 +589,12 @@ async function processBoardItemOperation(
       };
     }
     case 'delete': {
-      if (!data || !data.id) {
-        return { operationId: operation.id, status: 'error', message: 'ID ausente para exclusão' };
+      const parsed = boardItemDeleteDataSchema.safeParse(operation.data);
+      if (!parsed.success) {
+        return { operationId: operation.id, status: 'error', message: parsed.error.issues[0]?.message ?? 'Dados inválidos' };
       }
       const item = await prisma.boardItem.findFirst({
-        where: { id: data.id as string, deletedAt: null },
+        where: { id: parsed.data.id, deletedAt: null },
         include: { board: true },
       });
       if (!item || item.board.userId !== userId || item.board.deletedAt !== null) {
@@ -606,19 +616,19 @@ async function processReviewOperation(
   operation: OfflineOperation,
   operationTime: Date
 ): Promise<PushOperationResult> {
-  const data = operation.data as Record<string, unknown> | undefined;
-
   switch (operation.action) {
     case 'create': {
-      if (!data) {
-        return { operationId: operation.id, status: 'error', message: 'Dados ausentes para criação' };
+      const parsed = reviewCreateDataSchema.safeParse(operation.data);
+      if (!parsed.success) {
+        return { operationId: operation.id, status: 'error', message: parsed.error.issues[0]?.message ?? 'Dados inválidos' };
       }
-      // Check for unique constraint (userId + weekNumber + year)
+      const data = parsed.data;
+      // Check unique constraint
       const existingByWeek = await prisma.review.findFirst({
         where: {
           userId,
-          weekNumber: data.weekNumber as number,
-          year: data.year as number,
+          weekNumber: data.weekNumber,
+          year: data.year,
           deletedAt: null,
         },
       });
@@ -627,37 +637,45 @@ async function processReviewOperation(
       }
       await prisma.review.create({
         data: {
-          id: (data.id as string) || undefined,
+          id: data.id || undefined,
           userId,
-          weekNumber: (data.weekNumber as number) ?? 1,
-          year: (data.year as number) ?? new Date().getFullYear(),
-          startDate: (data.startDate as string) ?? '',
-          endDate: (data.endDate as string) ?? '',
-          learning: (data.learning as string) ?? '',
-          decisions: (data.decisions as string) ?? '',
-          resolvedProblems: (data.resolvedProblems as string) ?? '',
-          timeWaste: (data.timeWaste as string) ?? '',
-          nextWeekFocus: (data.nextWeekFocus as string) ?? '',
-          isLocked: true,
+          weekNumber: data.weekNumber,
+          year: data.year,
+          startDate: data.startDate,
+          endDate: data.endDate,
+          learning: data.learning,
+          decisions: data.decisions,
+          resolvedProblems: data.resolvedProblems,
+          timeWaste: data.timeWaste,
+          nextWeekFocus: data.nextWeekFocus,
+          isLocked: true, // SEC-002: always server-controlled
         },
       });
       return { operationId: operation.id, status: 'applied' };
     }
     case 'update': {
-      if (!data || !data.id) {
-        return { operationId: operation.id, status: 'error', message: 'ID ausente para atualização' };
+      const parsed = reviewUpdateDataSchema.safeParse(operation.data);
+      if (!parsed.success) {
+        return { operationId: operation.id, status: 'error', message: parsed.error.issues[0]?.message ?? 'Dados inválidos' };
       }
+      const data = parsed.data;
       const existing = await prisma.review.findFirst({
-        where: { id: data.id as string, userId, deletedAt: null },
+        where: { id: data.id, userId, deletedAt: null },
       });
       if (!existing) {
         return { operationId: operation.id, status: 'skipped', message: 'Revisão não encontrada' };
       }
       const conflict = hasConflict(existing.updatedAt, operationTime);
-      const { id: _id, ...updateData } = data;
+      // SEC-002: isLocked, weekNumber, year, startDate, endDate — NOT editable
       await prisma.review.update({
         where: { id: existing.id },
-        data: updateData as Parameters<typeof prisma.review.update>[0]['data'],
+        data: {
+          ...(data.learning !== undefined && { learning: data.learning }),
+          ...(data.decisions !== undefined && { decisions: data.decisions }),
+          ...(data.resolvedProblems !== undefined && { resolvedProblems: data.resolvedProblems }),
+          ...(data.timeWaste !== undefined && { timeWaste: data.timeWaste }),
+          ...(data.nextWeekFocus !== undefined && { nextWeekFocus: data.nextWeekFocus }),
+        },
       });
       return {
         operationId: operation.id,
@@ -666,11 +684,12 @@ async function processReviewOperation(
       };
     }
     case 'delete': {
-      if (!data || !data.id) {
-        return { operationId: operation.id, status: 'error', message: 'ID ausente para exclusão' };
+      const parsed = reviewDeleteDataSchema.safeParse(operation.data);
+      if (!parsed.success) {
+        return { operationId: operation.id, status: 'error', message: parsed.error.issues[0]?.message ?? 'Dados inválidos' };
       }
       const existing = await prisma.review.findFirst({
-        where: { id: data.id as string, userId, deletedAt: null },
+        where: { id: parsed.data.id, userId, deletedAt: null },
       });
       if (!existing) {
         return { operationId: operation.id, status: 'skipped', message: 'Revisão não encontrada' };
