@@ -8,7 +8,7 @@ interface AttachmentsFieldProps {
   attachments: ActivityAttachment[];
   onAdd: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onRemove: (id: string) => void;
-  fileInputRef: React.RefObject<HTMLInputElement | null>;
+  fileInputRef: React.RefObject<HTMLInputElement>;
   showDownload?: boolean;
 }
 
