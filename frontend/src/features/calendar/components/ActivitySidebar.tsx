@@ -6,8 +6,9 @@ import { useCalendarStore } from '../hooks/useCalendarStore';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/Button';
 import { Activity, RecurrenceType, PriorityType } from '../types/calendar.types';
-import { AddActivityDialog } from './AddActivityDialog';
+// import { ActivityDataDialog } from './ActivityDataDialog';
 import { ConfirmDeleteDialog } from './ConfirmDeleteDialog';
+import { ActivityDataDialog } from './ActivityDataDialog';
 
 const RECURRENCE_LABELS: Record<RecurrenceType, string> = {
   none: 'Não repete',
@@ -302,7 +303,7 @@ export function ActivitySidebar({ hasSelectedDate }: ActivitySidebarProps) {
       </div>
 
       {/* Add activity dialog */}
-      <AddActivityDialog open={isDialogOpen} onOpenChange={setIsDialogOpen} />
+      <ActivityDataDialog mode="create" open={isDialogOpen} onOpenChange={setIsDialogOpen} />
 
       {/* Confirm delete dialog */}
       <ConfirmDeleteDialog

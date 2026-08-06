@@ -4,7 +4,7 @@ import { CalendarToolbar } from '../components/CalendarToolbar';
 import { CalendarMonth } from '../components/CalendarMonth';
 import { EventDrawer } from '../components/EventDrawer';
 import { ActivitySidebar } from '../components/ActivitySidebar';
-import { ActivityDetailDrawer } from '../components/ActivityDetailDrawer';
+import { ActivityDataDialog } from '../components/ActivityDataDialog';
 
 const MIN_SIDEBAR_WIDTH = 280;
 const MAX_SIDEBAR_WIDTH = 600;
@@ -71,7 +71,7 @@ export function CalendarPage() {
       </div>
 
       <EventDrawer />
-      <ActivityDetailDrawer />
+      <ActivityDataDialog mode="edit" />
     </div>
   );
 }
