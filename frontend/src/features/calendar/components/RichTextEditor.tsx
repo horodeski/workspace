@@ -1,3 +1,4 @@
+import React from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -9,9 +10,10 @@ interface RichTextEditorProps {
   content: string;
   onChange: (html: string) => void;
   placeholder?: string;
+  editable?: boolean;
 }
 
-export function RichTextEditor({ content, onChange, placeholder = 'Escreva aqui...' }: RichTextEditorProps) {
+export function RichTextEditor({ content, onChange, placeholder = 'Escreva aqui...', editable = true }: RichTextEditorProps) {
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -21,6 +23,7 @@ export function RichTextEditor({ content, onChange, placeholder = 'Escreva aqui.
       Placeholder.configure({ placeholder }),
     ],
     content,
+    editable,
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
     },
@@ -31,10 +34,17 @@ export function RichTextEditor({ content, onChange, placeholder = 'Escreva aqui.
     },
   });
 
+  // Sync editable prop changes
+  React.useEffect(() => {
+    if (editor && editor.isEditable !== editable) {
+      editor.setEditable(editable);
+    }
+  }, [editor, editable]);
+
   if (!editor) return null;
 
   return (
-    <div className="border border-zinc-700 rounded-md overflow-hidden">
+    <div className={cn("border border-zinc-700 rounded-md overflow-hidden", !editable && "opacity-50 pointer-events-none")}>
       {/* Toolbar */}
       <div className="flex items-center gap-1 px-2 py-1.5 border-b border-zinc-700 bg-zinc-900/50">
         <ToolbarButton
