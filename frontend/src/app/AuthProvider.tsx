@@ -1,5 +1,7 @@
 import { ReactNode, useEffect, useState } from 'react';
 import { autoLogin } from '../lib/auth';
+import { getAccessToken } from '../lib/api';
+import { LoginPage } from './LoginPage';
 
 interface AuthProviderProps {
   children: ReactNode;
@@ -7,40 +9,18 @@ interface AuthProviderProps {
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const [isReady, setIsReady] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    autoLogin()
-      .then((success) => {
-        if (success) {
-          setIsReady(true);
-        } else {
-          setError('Falha ao conectar com o servidor. Verifique se o backend está rodando.');
-        }
-      })
-      .catch(() => {
-        setError('Erro de conexão com o servidor.');
-      });
+    autoLogin().then((success) => {
+      if (success) {
+        setIsAuthenticated(true);
+      }
+      setIsReady(true);
+    }).catch(() => {
+      setIsReady(true);
+    });
   }, []);
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
-        <div className="text-center space-y-4 p-8">
-          <p className="text-destructive font-medium">{error}</p>
-          <p className="text-sm text-muted-foreground">
-            Execute: sudo docker-compose up no diretório workspace-backend
-          </p>
-          <button
-            onClick={() => window.location.reload()}
-            className="text-sm underline text-primary"
-          >
-            Tentar novamente
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   if (!isReady) {
     return (
@@ -50,6 +30,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
           <p className="text-sm text-muted-foreground">Conectando...</p>
         </div>
       </div>
+    );
+  }
+
+  if (!isAuthenticated && !getAccessToken()) {
+    return (
+      <LoginPage onSuccess={() => setIsAuthenticated(true)} />
     );
   }
 
