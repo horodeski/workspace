@@ -12,6 +12,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
+    // If tokens already exist in storage (e.g. page refresh), skip autoLogin
+    if (getAccessToken()) {
+      setIsAuthenticated(true);
+      setIsReady(true);
+      return;
+    }
+
     autoLogin().then((success) => {
       if (success) {
         setIsAuthenticated(true);
