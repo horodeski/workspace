@@ -2,7 +2,6 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
 import { useCalendarStore } from '../../hooks/useCalendarStore';
-import { useDebouncedUpdate } from '../../hooks/useDebouncedUpdate';
 import { RichTextEditor } from '../RichTextEditor';
 import { Input } from '@/components/Input';
 import { Button } from '@/components/Button';
@@ -48,9 +47,6 @@ export function ActivityDataDialog(props: ActivityDataDialogProps) {
   const selectedDate = useCalendarStore((state) => state.selectedDate);
   const addActivity = useCalendarStore((state) => state.addActivity);
 
-  // Debounced update for edit mode
-  const debouncedUpdate = useDebouncedUpdate(updateActivity);
-
   // Local state (create mode)
   const [title, setTitle] = useState('');
   const [date, setDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
@@ -62,7 +58,7 @@ export function ActivityDataDialog(props: ActivityDataDialogProps) {
   const [description, setDescription] = useState('');
   const [attachments, setAttachments] = useState<ActivityAttachment[]>([]);
   const [error, setError] = useState('');
-  const loading = false; // Create dialog closes before async operation
+  const [loading, setLoading] = useState(false);
 
   // Local state for edit mode (mirrors activity, syncs via debounce)
   const [editTitle, setEditTitle] = useState('');
@@ -86,7 +82,7 @@ export function ActivityDataDialog(props: ActivityDataDialogProps) {
     }
   }, [isEditMode, activity?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Helper: update local edit state + schedule debounced API call
+  // Helper: update local edit state only (save happens on submit)
   const handleEditChange = useCallback(
     (field: keyof Activity, value: unknown) => {
       if (!activity) return;
@@ -99,9 +95,8 @@ export function ActivityDataDialog(props: ActivityDataDialogProps) {
         case 'priority': setEditPriority(value as PriorityType | null); break;
         case 'description': setEditDescription(value as string); break;
       }
-      debouncedUpdate(activity.id, { [field]: value } as Partial<Activity>);
     },
-    [activity, debouncedUpdate]
+    [activity]
   );
 
   // Determine open state
@@ -128,7 +123,7 @@ export function ActivityDataDialog(props: ActivityDataDialogProps) {
   };
 
   const handleOpenChange = (open: boolean) => {
-    if (!isEditMode && loading) return;
+    if (loading) return;
 
     if (isEditMode) {
       if (!open) closeDetail();
@@ -140,6 +135,22 @@ export function ActivityDataDialog(props: ActivityDataDialogProps) {
 
   const handleSubmit = async () => {
     if (isEditMode) {
+      if (activity) {
+        setLoading(true);
+        try {
+          await updateActivity(activity.id, {
+            title: editTitle,
+            date: editDate,
+            startTime: editStartTime || null,
+            duration: editDuration,
+            recurrence: editRecurrence,
+            priority: editPriority,
+            description: editDescription,
+          });
+        } finally {
+          setLoading(false);
+        }
+      }
       closeDetail();
       return;
     }
