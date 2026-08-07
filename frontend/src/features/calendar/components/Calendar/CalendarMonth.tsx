@@ -11,8 +11,8 @@ import {
   endOfDay,
 } from 'date-fns';
 import { useEffect } from 'react';
-import { CalendarEventType, PriorityType } from '../types/calendar.types';
-import { useCalendarStore } from '../hooks/useCalendarStore';
+import { CalendarEventType, PriorityType } from '../../types/calendar.types';
+import { useCalendarStore } from '../../hooks/useCalendarStore';
 import { Badge } from '@/components/ui/badge';
 
 interface CalendarMonthProps {
@@ -37,7 +37,6 @@ export function CalendarMonth({ month, events }: CalendarMonthProps) {
   const selectedDate = useCalendarStore((state) => state.selectedDate);
   const setSelectedDate = useCalendarStore((state) => state.setSelectedDate);
   const monthActivities = useCalendarStore((state) => state.monthActivities);
-  const activities = useCalendarStore((state) => state.activities);
   const fetchActivitiesForMonth = useCalendarStore((state) => state.fetchActivitiesForMonth);
 
   // Fetch activities for the entire month for calendar badges
@@ -64,9 +63,7 @@ export function CalendarMonth({ month, events }: CalendarMonthProps) {
 
   const getActivitiesForDay = (day: Date) => {
     const dateStr = format(day, 'yyyy-MM-dd');
-    // For the selected date, use sidebar activities; for others, use monthActivities
-    const source = isSameDay(day, selectedDate) ? activities : monthActivities;
-    return source.filter((a) => {
+    return monthActivities.filter((a) => {
       const actDate = a.instanceDate || a.date;
       return actDate === dateStr;
     });

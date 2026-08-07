@@ -1,0 +1,103 @@
+name: 🚀 Feature
+description: Solicite uma nova funcionalidade
+title: "[FEATURE] "
+labels:
+  - feature
+
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: 📋 Resumo
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: 🎯 Problema
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: 💡 Solução Proposta
+    validations:
+      required: true
+
+  - type: textarea
+    id: flow
+    attributes:
+      label: 👤 Fluxo do Usuário
+      placeholder: |
+        1.
+        2.
+        3.
+
+  - type: textarea
+    id: references
+    attributes:
+      label: 📸 Referências
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: ✅ Critérios de Aceite
+      value: |
+        - [ ]
+        - [ ]
+        - [ ]
+        - [ ]
+
+  - type: textarea
+    id: business_rules
+    attributes:
+      label: 🔐 Regras de Negócio
+      value: |
+        -
+        -
+        -
+
+  - type: textarea
+    id: technical
+    attributes:
+      label: ⚙️ Requisitos Técnicos
+      value: |
+        Backend
+
+        -
+
+        Frontend
+
+        -
+
+        Banco de Dados
+
+        -
+
+  - type: textarea
+    id: tests
+    attributes:
+      label: 🧪 Casos de Teste
+      value: |
+        Cenário Feliz
+
+        -
+
+        Cenários de Erro
+
+        -
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: ✔ Checklist
+      options:
+        - label: Código limpo
+        - label: Testes
+        - label: Cobertura
+        - label: Logs
+        - label: Tratamento de erro
+        - label: Performance
+        - label: Segurança

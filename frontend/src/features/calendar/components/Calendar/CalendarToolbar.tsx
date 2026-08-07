@@ -2,7 +2,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useCalendarStore } from '../hooks/useCalendarStore';
+import { useCalendarStore } from '../../hooks/useCalendarStore';
 
 export function CalendarToolbar() {
   const selectedDate = useCalendarStore((state) => state.selectedDate);

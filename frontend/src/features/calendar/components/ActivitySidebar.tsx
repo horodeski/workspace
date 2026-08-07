@@ -6,8 +6,9 @@ import { useCalendarStore } from '../hooks/useCalendarStore';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/Button';
 import { Activity, RecurrenceType, PriorityType } from '../types/calendar.types';
-import { AddActivityDialog } from './AddActivityDialog';
+// import { ActivityDataDialog } from './ActivityDataDialog';
 import { ConfirmDeleteDialog } from './ConfirmDeleteDialog';
+import { ActivityDataDialog } from './ActivityDataDialog';
 
 const RECURRENCE_LABELS: Record<RecurrenceType, string> = {
   none: 'Não repete',
@@ -117,15 +118,6 @@ export function ActivitySidebar({ hasSelectedDate }: ActivitySidebarProps) {
     );
   }
 
-  if (isLoading && activities.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full text-zinc-500 gap-3">
-        <div className="animate-spin h-6 w-6 border-2 border-zinc-400 border-t-transparent rounded-full" />
-        <p className="text-sm">Carregando...</p>
-      </div>
-    );
-  }
-
   const dayActivities = activities;
   const groups = groupActivitiesByPeriod(dayActivities);
   const dateLabel = format(selectedDate, "EEEE, d 'de' MMMM", { locale: ptBR });
@@ -162,7 +154,12 @@ export function ActivitySidebar({ hasSelectedDate }: ActivitySidebarProps) {
 
       {/* Activities list */}
       <div className="flex-1 overflow-y-auto p-4">
-        {dayActivities.length === 0 ? (
+        {isLoading && dayActivities.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-zinc-500 gap-3">
+            <div className="animate-spin h-6 w-6 border-2 border-zinc-400 border-t-transparent rounded-full" />
+            <p className="text-sm">Carregando...</p>
+          </div>
+        ) : dayActivities.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-zinc-500 gap-2">
             <CalendarDays className="w-8 h-8 text-zinc-600" />
             <p className="text-sm">Nenhuma atividade para este dia.</p>
@@ -302,7 +299,7 @@ export function ActivitySidebar({ hasSelectedDate }: ActivitySidebarProps) {
       </div>
 
       {/* Add activity dialog */}
-      <AddActivityDialog open={isDialogOpen} onOpenChange={setIsDialogOpen} />
+      <ActivityDataDialog mode="create" open={isDialogOpen} onOpenChange={setIsDialogOpen} />
 
       {/* Confirm delete dialog */}
       <ConfirmDeleteDialog

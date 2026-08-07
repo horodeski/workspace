@@ -1,10 +1,9 @@
 import { useState, useCallback, useRef } from 'react';
 import { useCalendarStore } from '../hooks/useCalendarStore';
-import { CalendarToolbar } from '../components/CalendarToolbar';
-import { CalendarMonth } from '../components/CalendarMonth';
-import { EventDrawer } from '../components/EventDrawer';
+import { CalendarMonth } from '../components/Calendar/CalendarMonth';
 import { ActivitySidebar } from '../components/ActivitySidebar';
-import { ActivityDetailDrawer } from '../components/ActivityDetailDrawer';
+import { ActivityDataDialog } from '../components/ActivityDataDialog';
+import { CalendarToolbar } from '../components/Calendar/CalendarToolbar';
 
 const MIN_SIDEBAR_WIDTH = 280;
 const MAX_SIDEBAR_WIDTH = 600;
@@ -69,9 +68,7 @@ export function CalendarPage() {
           <ActivitySidebar hasSelectedDate={!!selectedDate} />
         </div>
       </div>
-
-      <EventDrawer />
-      <ActivityDetailDrawer />
+      <ActivityDataDialog mode="edit" />
     </div>
   );
 }
