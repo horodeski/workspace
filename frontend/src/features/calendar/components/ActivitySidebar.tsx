@@ -118,15 +118,6 @@ export function ActivitySidebar({ hasSelectedDate }: ActivitySidebarProps) {
     );
   }
 
-  if (isLoading && activities.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full text-zinc-500 gap-3">
-        <div className="animate-spin h-6 w-6 border-2 border-zinc-400 border-t-transparent rounded-full" />
-        <p className="text-sm">Carregando...</p>
-      </div>
-    );
-  }
-
   const dayActivities = activities;
   const groups = groupActivitiesByPeriod(dayActivities);
   const dateLabel = format(selectedDate, "EEEE, d 'de' MMMM", { locale: ptBR });
@@ -163,7 +154,12 @@ export function ActivitySidebar({ hasSelectedDate }: ActivitySidebarProps) {
 
       {/* Activities list */}
       <div className="flex-1 overflow-y-auto p-4">
-        {dayActivities.length === 0 ? (
+        {isLoading && dayActivities.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-zinc-500 gap-3">
+            <div className="animate-spin h-6 w-6 border-2 border-zinc-400 border-t-transparent rounded-full" />
+            <p className="text-sm">Carregando...</p>
+          </div>
+        ) : dayActivities.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-zinc-500 gap-2">
             <CalendarDays className="w-8 h-8 text-zinc-600" />
             <p className="text-sm">Nenhuma atividade para este dia.</p>

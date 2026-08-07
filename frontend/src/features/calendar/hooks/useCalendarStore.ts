@@ -243,7 +243,7 @@ export const useCalendarStore = create<CalendarState & CalendarActions>(
     // Activity actions (async, API-backed)
     fetchActivitiesForDate: async (date: Date) => {
       const dateStr = format(date, 'yyyy-MM-dd');
-      set({ isLoading: true, error: null });
+      set({ isLoading: true, error: null, activities: [] });
       try {
         const raw = await api.get<(Activity & { completedOnDate?: boolean })[]>(`/activities?date=${dateStr}`);
         // Map backend field `completedOnDate` to frontend field `completed`
@@ -308,22 +308,27 @@ export const useCalendarStore = create<CalendarState & CalendarActions>(
     },
 
     toggleActivity: async (id: string) => {
-      const { selectedDate } = get();
+      const { selectedDate, activities, selectedActivity } = get();
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
-      set({ isLoading: true, error: null });
+
+      // Optimistic update
+      const updatedActivities = activities.map((a) =>
+        a.id === id ? { ...a, completed: !a.completed } : a
+      );
+      set({ activities: updatedActivities });
+      if (selectedActivity?.id === id) {
+        set({ selectedActivity: { ...selectedActivity, completed: !selectedActivity.completed } });
+      }
+
       try {
         await api.patch(`/activities/${id}/toggle`, { date: dateStr });
-        await get().fetchActivitiesForDate(selectedDate);
-        await get().fetchActivitiesForMonth(selectedDate);
-        // Update selectedActivity if it's the one being toggled
-        const { selectedActivity, activities } = get();
-        if (selectedActivity?.id === id) {
-          const updated = activities.find((a) => a.id === id);
-          if (updated) set({ selectedActivity: updated });
-        }
+        // Refresh month activities for calendar badges
+        get().fetchActivitiesForMonth(selectedDate);
       } catch (err) {
+        // Revert on error
+        set({ activities, selectedActivity });
         const message = err instanceof Error ? err.message : 'Failed to toggle activity';
-        set({ error: message, isLoading: false });
+        set({ error: message });
       }
     },
 

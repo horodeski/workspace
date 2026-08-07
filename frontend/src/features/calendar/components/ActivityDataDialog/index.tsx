@@ -1,12 +1,12 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
 import { useCalendarStore } from '../../hooks/useCalendarStore';
+import { useDebouncedUpdate } from '../../hooks/useDebouncedUpdate';
 import { RichTextEditor } from '../RichTextEditor';
 import { Input } from '@/components/Input';
 import { Button } from '@/components/Button';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -14,7 +14,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { RecurrenceType, PriorityType, ActivityAttachment } from '../../types/calendar.types';
+import { RecurrenceType, PriorityType, ActivityAttachment, Activity } from '../../types/calendar.types';
 import { DateField } from './DateField';
 import { DurationField } from './DurationField';
 import { RecurrenceField } from './RecurrenceField';
@@ -43,11 +43,13 @@ export function ActivityDataDialog(props: ActivityDataDialogProps) {
   const activity = useCalendarStore((state) => state.selectedActivity);
   const closeDetail = useCalendarStore((state) => state.closeActivityDetail);
   const updateActivity = useCalendarStore((state) => state.updateActivity);
-  const toggleActivity = useCalendarStore((state) => state.toggleActivity);
   const storeAddAttachment = useCalendarStore((state) => state.addAttachment);
   const storeRemoveAttachment = useCalendarStore((state) => state.removeAttachment);
   const selectedDate = useCalendarStore((state) => state.selectedDate);
   const addActivity = useCalendarStore((state) => state.addActivity);
+
+  // Debounced update for edit mode
+  const debouncedUpdate = useDebouncedUpdate(updateActivity);
 
   // Local state (create mode)
   const [title, setTitle] = useState('');
@@ -60,7 +62,47 @@ export function ActivityDataDialog(props: ActivityDataDialogProps) {
   const [description, setDescription] = useState('');
   const [attachments, setAttachments] = useState<ActivityAttachment[]>([]);
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const loading = false; // Create dialog closes before async operation
+
+  // Local state for edit mode (mirrors activity, syncs via debounce)
+  const [editTitle, setEditTitle] = useState('');
+  const [editDate, setEditDate] = useState('');
+  const [editStartTime, setEditStartTime] = useState('');
+  const [editDuration, setEditDuration] = useState<number | null>(null);
+  const [editRecurrence, setEditRecurrence] = useState<RecurrenceType>('none');
+  const [editPriority, setEditPriority] = useState<PriorityType | null>(null);
+  const [editDescription, setEditDescription] = useState('');
+
+  // Sync local edit state when activity changes (opening detail or external update)
+  useEffect(() => {
+    if (isEditMode && activity) {
+      setEditTitle(activity.title);
+      setEditDate(activity.date);
+      setEditStartTime(activity.startTime || '');
+      setEditDuration(activity.duration);
+      setEditRecurrence(activity.recurrence);
+      setEditPriority(activity.priority);
+      setEditDescription(activity.description);
+    }
+  }, [isEditMode, activity?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Helper: update local edit state + schedule debounced API call
+  const handleEditChange = useCallback(
+    (field: keyof Activity, value: unknown) => {
+      if (!activity) return;
+      switch (field) {
+        case 'title': setEditTitle(value as string); break;
+        case 'date': setEditDate(value as string); break;
+        case 'startTime': setEditStartTime((value as string) || ''); break;
+        case 'duration': setEditDuration(value as number | null); break;
+        case 'recurrence': setEditRecurrence(value as RecurrenceType); break;
+        case 'priority': setEditPriority(value as PriorityType | null); break;
+        case 'description': setEditDescription(value as string); break;
+      }
+      debouncedUpdate(activity.id, { [field]: value } as Partial<Activity>);
+    },
+    [activity, debouncedUpdate]
+  );
 
   // Determine open state
   const dialogOpen = isEditMode ? isActivityDetailOpen : props.open;
@@ -112,22 +154,22 @@ export function ActivityDataDialog(props: ActivityDataDialogProps) {
       return;
     }
 
-    setLoading(true);
-    try {
-      await addActivity({
-        title: trimmed,
-        description,
-        date,
-        startTime: startTime || null,
-        duration,
-        recurrence,
-        priority,
-      });
-      resetForm();
-      props.onOpenChange(false);
-    } finally {
-      setLoading(false);
-    }
+    // Capture form data before resetting
+    const formData = {
+      title: trimmed,
+      description,
+      date,
+      startTime: startTime || null,
+      duration,
+      recurrence,
+      priority,
+    };
+
+    // Close dialog immediately to prevent reopen on sidebar remount
+    resetForm();
+    props.onOpenChange(false);
+
+    await addActivity(formData);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -177,14 +219,14 @@ export function ActivityDataDialog(props: ActivityDataDialogProps) {
   // Edit mode with no activity selected
   if (isEditMode && !activity) return null;
 
-  // Resolved values (edit reads from activity, create reads from local state)
-  const currentTitle = isEditMode ? activity!.title : title;
-  const currentDate = isEditMode ? activity!.date : date;
-  const currentStartTime = isEditMode ? (activity!.startTime || '') : startTime;
-  const currentDuration = isEditMode ? activity!.duration : duration;
-  const currentRecurrence = isEditMode ? activity!.recurrence : recurrence;
-  const currentPriority = isEditMode ? activity!.priority : priority;
-  const currentDescription = isEditMode ? activity!.description : description;
+  // Resolved values (edit reads from local edit state, create reads from local state)
+  const currentTitle = isEditMode ? editTitle : title;
+  const currentDate = isEditMode ? editDate : date;
+  const currentStartTime = isEditMode ? editStartTime : startTime;
+  const currentDuration = isEditMode ? editDuration : duration;
+  const currentRecurrence = isEditMode ? editRecurrence : recurrence;
+  const currentPriority = isEditMode ? editPriority : priority;
+  const currentDescription = isEditMode ? editDescription : description;
   const currentAttachments = isEditMode ? activity!.attachments : attachments;
 
   const dateLabel = isEditMode
@@ -207,40 +249,27 @@ export function ActivityDataDialog(props: ActivityDataDialogProps) {
         </DialogHeader>
 
         <fieldset disabled={loading} className="flex flex-col gap-4 mt-2">
-          {/* Title (with checkbox in edit mode) */}
-          {isEditMode ? (
-            <div className="flex items-start gap-3">
-              <Checkbox
-                checked={activity!.completed}
-                onCheckedChange={() => toggleActivity(activity!.id)}
-                className="mt-2"
-                aria-label={`Marcar como ${activity!.completed ? 'pendente' : 'concluída'}`}
-              />
-              <div className="flex-1">
-                <Input
-                  value={currentTitle}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateActivity(activity!.id, { title: e.target.value })}
-                  placeholder="Título da atividade"
-                  className="text-lg font-medium"
-                  aria-label="Título"
-                />
-              </div>
-            </div>
-          ) : (
-            <Input
-              placeholder="Título da atividade..."
-              value={currentTitle}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setTitle(e.target.value); if (error) setError(''); }}
-              onKeyDown={handleKeyDown}
-              error={error}
-              label="Título"
-              aria-label="Título da atividade"
-            />
-          )}
+          <Input
+            placeholder="Título da atividade..."
+            value={currentTitle}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+              if (isEditMode) {
+                handleEditChange('title', e.target.value);
+              } else {
+                setTitle(e.target.value);
+                if (error) setError('');
+              }
+            }}
+            onKeyDown={!isEditMode ? handleKeyDown : undefined}
+            error={!isEditMode ? error : undefined}
+            label={!isEditMode ? 'Título' : undefined}
+            className={isEditMode ? 'text-lg font-medium' : undefined}
+            aria-label="Título da atividade"
+          />
 
           <DateField
             date={currentDate}
-            onChange={(d) => isEditMode ? updateActivity(activity!.id, { date: d }) : setDate(d)}
+            onChange={(d) => isEditMode ? handleEditChange('date', d) : setDate(d)}
           />
 
           <div className="grid grid-cols-2 gap-3 items-end">
@@ -250,14 +279,14 @@ export function ActivityDataDialog(props: ActivityDataDialogProps) {
               value={currentStartTime}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                 isEditMode
-                  ? updateActivity(activity!.id, { startTime: e.target.value || null })
+                  ? handleEditChange('startTime', e.target.value || null)
                   : setStartTime(e.target.value)
               }
               onClick={!isEditMode ? () => setDurationOpen(true) : undefined}
             />
             <DurationField
               value={currentDuration}
-              onChange={(v) => isEditMode ? updateActivity(activity!.id, { duration: v }) : setDuration(v)}
+              onChange={(v) => isEditMode ? handleEditChange('duration', v) : setDuration(v)}
               open={!isEditMode ? durationOpen : undefined}
               onOpenChange={!isEditMode ? setDurationOpen : undefined}
             />
@@ -265,19 +294,19 @@ export function ActivityDataDialog(props: ActivityDataDialogProps) {
 
           <RecurrenceField
             value={currentRecurrence}
-            onChange={(v) => isEditMode ? updateActivity(activity!.id, { recurrence: v }) : setRecurrence(v)}
+            onChange={(v) => isEditMode ? handleEditChange('recurrence', v) : setRecurrence(v)}
           />
 
           <PriorityField
             value={currentPriority}
-            onChange={(v) => isEditMode ? updateActivity(activity!.id, { priority: v }) : setPriority(v)}
+            onChange={(v) => isEditMode ? handleEditChange('priority', v) : setPriority(v)}
           />
 
           <div>
             <Label className="mb-2 block">Notas / Detalhes</Label>
             <RichTextEditor
               content={currentDescription}
-              onChange={(html: string) => isEditMode ? updateActivity(activity!.id, { description: html }) : setDescription(html)}
+              onChange={(html: string) => isEditMode ? handleEditChange('description', html) : setDescription(html)}
               placeholder="Adicione notas, detalhes, links..."
               editable={!loading}
             />
