@@ -1,15 +1,22 @@
-// Token storage (in-memory only, not localStorage)
-let accessToken: string | null = null;
-let refreshToken: string | null = null;
+// Token storage (persisted in localStorage to survive page refresh)
+const ACCESS_TOKEN_KEY = 'access_token';
+const REFRESH_TOKEN_KEY = 'refresh_token';
+
+let accessToken: string | null = localStorage.getItem(ACCESS_TOKEN_KEY);
+let refreshToken: string | null = localStorage.getItem(REFRESH_TOKEN_KEY);
 
 export function setTokens(access: string, refresh: string) {
   accessToken = access;
   refreshToken = refresh;
+  localStorage.setItem(ACCESS_TOKEN_KEY, access);
+  localStorage.setItem(REFRESH_TOKEN_KEY, refresh);
 }
 
 export function clearTokens() {
   accessToken = null;
   refreshToken = null;
+  localStorage.removeItem(ACCESS_TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
 }
 
 export function getAccessToken() {
@@ -66,6 +73,10 @@ async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
     if (refreshed) {
       headers['Authorization'] = `Bearer ${accessToken}`;
       res = await fetch(`${BASE_URL}${url}`, { ...options, headers });
+    } else {
+      clearTokens();
+      window.location.reload();
+      throw new ApiError(401, 'Session expired');
     }
   }
 
