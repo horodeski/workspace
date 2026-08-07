@@ -379,7 +379,7 @@ describe('useCalendarStore', () => {
       await useCalendarStore.getState().toggleActivity('1');
 
       expect(mockedApi.patch).toHaveBeenCalledWith('/activities/1/toggle', { date: '2024-01-15' });
-      expect(mockedApi.get).toHaveBeenCalledWith('/activities?date=2024-01-15');
+      expect(mockedApi.get).toHaveBeenCalledWith('/activities?startDate=2024-01-01&endDate=2024-01-31');
     });
   });
 
