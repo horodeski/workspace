@@ -20,8 +20,6 @@ export interface ReflectionFieldProps {
 
 /**
  * Extracts plain text length from HTML content (strips tags via regex).
- * Uses regex instead of innerHTML to avoid triggering side-effects
- * (e.g., external image loads from malicious HTML).
  */
 function getTextLength(html: string): number {
   if (!html || html === '<p></p>') return 0;
@@ -45,6 +43,21 @@ export const ReflectionField: React.FC<ReflectionFieldProps> = ({
     .filter(Boolean)
     .join(' ');
 
+  // Ref to latest onChange to keep editor config stable
+  const onChangeRef = React.useRef(onChange);
+  onChangeRef.current = onChange;
+
+  // Ref to track if we're programmatically updating content
+  const isSyncingRef = React.useRef(false);
+
+  // Use a stable key to detect when content should be reinitialized
+  // This ensures the editor recreates with correct content when value changes from empty to filled
+  const contentKey = React.useMemo(() => {
+    // Create a key based on whether value has content or not
+    const hasContent = value && value !== '<p></p>' && value.replace(/<[^>]*>/g, '').trim().length > 0;
+    return hasContent ? 'has-content' : 'empty';
+  }, [value]);
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -54,18 +67,19 @@ export const ReflectionField: React.FC<ReflectionFieldProps> = ({
     ],
     content: value || '',
     editable: !disabled,
-    onUpdate: ({ editor }) => {
-      const html = editor.getHTML();
-      const textLength = editor.state.doc.textContent.length;
+    immediatelyRender: true,
+    onUpdate: ({ editor: ed }) => {
+      if (isSyncingRef.current) return;
 
-      // Enforce max length on plain text content
+      const html = ed.getHTML();
+      const textLength = ed.state.doc.textContent.length;
+
       if (textLength > MAX_LENGTH) {
-        // Truncate by reverting to previous content
-        editor.commands.undo();
+        ed.commands.undo();
         return;
       }
 
-      onChange(html);
+      onChangeRef.current(html);
     },
     editorProps: {
       attributes: {
@@ -83,19 +97,27 @@ export const ReflectionField: React.FC<ReflectionFieldProps> = ({
         ),
       },
     },
-  });
+  }, [contentKey, disabled]);
 
   // Sync disabled state
   React.useEffect(() => {
-    if (editor) {
-      editor.setEditable(!disabled);
+    if (editor && !editor.isDestroyed) {
+      if (editor.isEditable !== !disabled) {
+        editor.setEditable(!disabled, false);
+      }
     }
   }, [editor, disabled]);
 
-  // Sync content when value changes externally (e.g., form reset after save)
+  // Sync content when value changes externally (backup for deps-based recreation)
   React.useEffect(() => {
-    if (editor && value !== editor.getHTML()) {
+    if (!editor || editor.isDestroyed) return;
+    if (value === editor.getHTML()) return;
+
+    isSyncingRef.current = true;
+    try {
       editor.commands.setContent(value || '');
+    } finally {
+      isSyncingRef.current = false;
     }
   }, [editor, value]);
 

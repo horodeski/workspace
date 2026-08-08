@@ -87,6 +87,7 @@ export const WeeklyReviewEditPage: React.FC = () => {
 
   // Get existing review
   const [existingReview, setExistingReview] = useState<Review | null>(null);
+  const [isLoadingReview, setIsLoadingReview] = useState(true);
   const [isLocked, setIsLocked] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
@@ -95,10 +96,14 @@ export const WeeklyReviewEditPage: React.FC = () => {
   useEffect(() => {
     if (!isValidParams) return;
     let cancelled = false;
+    setIsLoadingReview(true);
     getReviewByWeek(yearNum, weekNum).then((review) => {
-      if (!cancelled && review) {
-        setExistingReview(review);
-        setIsLocked(review.isLocked);
+      if (!cancelled) {
+        if (review) {
+          setExistingReview(review);
+          setIsLocked(review.isLocked);
+        }
+        setIsLoadingReview(false);
       }
     });
     return () => { cancelled = true; };
@@ -120,11 +125,11 @@ export const WeeklyReviewEditPage: React.FC = () => {
   useEffect(() => {
     if (existingReview) {
       form.reset({
-        learning: existingReview.learning,
-        decisions: existingReview.decisions,
-        resolvedProblems: existingReview.resolvedProblems,
-        timeWaste: existingReview.timeWaste,
-        nextWeekFocus: existingReview.nextWeekFocus,
+        learning: existingReview.learning || '',
+        decisions: existingReview.decisions || '',
+        resolvedProblems: existingReview.resolvedProblems || '',
+        timeWaste: existingReview.timeWaste || '',
+        nextWeekFocus: existingReview.nextWeekFocus || '',
       });
     }
   }, [existingReview, form]);
@@ -159,6 +164,15 @@ export const WeeklyReviewEditPage: React.FC = () => {
   // Redirect if invalid params
   if (!isValidParams || !weekData) {
     return <Navigate to="/weekly-review" replace />;
+  }
+
+  if (isLoadingReview) {
+    return (
+      <div className="mx-auto w-full px-4 sm:max-w-[640px] lg:max-w-[720px] flex flex-col items-center justify-center h-full text-zinc-500 gap-3">
+        <div className="animate-spin h-6 w-6 border-2 border-zinc-400 border-t-transparent rounded-full" />
+        <span className="text-sm">Carregando revisão...</span>
+      </div>
+    );
   }
 
   const handleSave = async (data: ReviewFormData) => {
@@ -219,6 +233,7 @@ export const WeeklyReviewEditPage: React.FC = () => {
             control={form.control}
             render={({ field: controllerField, fieldState }) => (
               <ReflectionField
+                key={`${field.name}-${existingReview?.id ?? 'new'}`}
                 id={`reflection-${field.name}`}
                 emoji={field.emoji}
                 label={field.label}

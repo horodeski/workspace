@@ -1,34 +1,37 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useReviewStore } from '../hooks/useReviewStore';
 import { useWeekCalculation } from '../hooks/useWeekCalculation';
 import { EmptyState } from '../components/EmptyState';
 import { CurrentWeekCard } from '../components/CurrentWeekCard';
 import { HistoryList } from '../components/HistoryList';
-import type { Review } from '../types/review.types';
 
 export const WeeklyReviewPage: React.FC = () => {
-  const { reviews, getReviewByWeek, getRecentWeeks, fetchRecentWeeks } = useReviewStore();
+  const { isLoading, getRecentWeeks, fetchRecentWeeks } = useReviewStore();
   const { weekNumber, year } = useWeekCalculation();
-  const [currentWeekReview, setCurrentWeekReview] = useState<Review | null>(null);
+  const [initialLoad, setInitialLoad] = useState(true);
+  const fetched = useRef(false);
 
   useEffect(() => {
-    fetchRecentWeeks();
+    if (fetched.current) return;
+    fetched.current = true;
+    fetchRecentWeeks().finally(() => setInitialLoad(false));
   }, [fetchRecentWeeks]);
 
-  useEffect(() => {
-    let cancelled = false;
-    getReviewByWeek(year, weekNumber).then((review) => {
-      if (!cancelled) {
-        setCurrentWeekReview(review);
-      }
-    });
-    return () => { cancelled = true; };
-  }, [year, weekNumber, getReviewByWeek]);
-
-  const hasReviews = reviews.length > 0;
   const recentWeeks = getRecentWeeks();
+  const currentWeekData = recentWeeks.find(
+    (w) => w.weekNumber === weekNumber && w.year === year
+  );
 
-  if (!hasReviews) {
+  if (initialLoad && isLoading) {
+    return (
+      <div className="mx-auto w-full px-4 sm:max-w-[640px] lg:max-w-[720px] flex flex-col items-center justify-center h-full text-zinc-500 gap-3">
+        <div className="animate-spin h-6 w-6 border-2 border-zinc-400 border-t-transparent rounded-full" />
+        <span className="text-sm">Carregando...</span>
+      </div>
+    );
+  }
+
+  if (recentWeeks.length === 0) {
     return (
       <div className="mx-auto w-full px-4 sm:max-w-[640px] lg:max-w-[720px]">
         <EmptyState />
@@ -42,13 +45,12 @@ export const WeeklyReviewPage: React.FC = () => {
         Weekly Review
       </h1>
 
-      {currentWeekReview && (
+      {currentWeekData?.hasReview && (
         <div className="mb-6">
           <CurrentWeekCard
-            weekNumber={currentWeekReview.weekNumber}
-            year={currentWeekReview.year}
-            isLocked={currentWeekReview.isLocked}
-            updatedAt={currentWeekReview.updatedAt}
+            weekNumber={currentWeekData.weekNumber}
+            year={currentWeekData.year}
+            isLocked={currentWeekData.isLocked}
           />
         </div>
       )}

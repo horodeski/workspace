@@ -1,6 +1,5 @@
 import React from 'react';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Button } from '@/components/ui/button';
 import {
   ContextMenu,
@@ -9,6 +8,7 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
 } from '@/components/ui/context-menu';
+import { cn } from '@/lib/utils';
 import type { BoardSummary } from '../hooks/useBoardModuleStore';
 
 export interface BoardBarProps {
@@ -40,28 +40,27 @@ export const BoardBar: React.FC<BoardBarProps> = ({
       data-testid="board-bar"
       className="flex items-center gap-2 overflow-x-auto px-2 py-3 border-b"
     >
-      <ToggleGroup
-        type="single"
-        value={activeBoardId ?? undefined}
-        onValueChange={(val) => {
-          if (val) {
-            onSelectBoard(val);
-          }
-        }}
-        className="flex items-center gap-1"
-        aria-label="Quadros"
-      >
-        {sortedBoards.map((board) => (
+      <div className="flex items-center gap-1" role="tablist" aria-label="Quadros">
+        {sortedBoards.map((board) => {
+          const isActive = board.id === activeBoardId;
+          return (
           <ContextMenu key={board.id}>
             <ContextMenuTrigger asChild>
-              <ToggleGroupItem
-                value={board.id}
+              <button
+                role="tab"
+                aria-selected={isActive}
                 data-testid={`board-tab-${board.id}`}
                 aria-label={`Quadro ${board.name}`}
-                className="shrink-0"
+                onClick={() => onSelectBoard(board.id)}
+                className={cn(
+                  'inline-flex items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium transition-colors shrink-0',
+                  isActive
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground'
+                )}
               >
                 {board.name}
-              </ToggleGroupItem>
+              </button>
             </ContextMenuTrigger>
             <ContextMenuContent>
               <ContextMenuItem
@@ -83,8 +82,9 @@ export const BoardBar: React.FC<BoardBarProps> = ({
               </ContextMenuItem>
             </ContextMenuContent>
           </ContextMenu>
-        ))}
-      </ToggleGroup>
+          );
+        })}
+      </div>
 
       <Button
         variant="ghost"

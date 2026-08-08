@@ -6,8 +6,7 @@ import { useCalendarStore } from '../hooks/useCalendarStore';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/Button';
 import { Activity, RecurrenceType, PriorityType } from '../types/calendar.types';
-// import { ActivityDataDialog } from './ActivityDataDialog';
-import { ConfirmDeleteDialog } from './ConfirmDeleteDialog';
+import { ConfirmDeleteDialog } from '@/components/ConfirmDeleteDialog';
 import { ActivityDataDialog } from './ActivityDataDialog';
 
 const RECURRENCE_LABELS: Record<RecurrenceType, string> = {
@@ -93,6 +92,7 @@ interface ActivitySidebarProps {
 export function ActivitySidebar({ hasSelectedDate }: ActivitySidebarProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Activity | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const selectedDate = useCalendarStore((state) => state.selectedDate);
   const activities = useCalendarStore((state) => state.activities);
@@ -306,9 +306,12 @@ export function ActivitySidebar({ hasSelectedDate }: ActivitySidebarProps) {
         open={!!deleteTarget}
         onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
         title={deleteTarget?.title || ''}
-        onConfirm={() => {
+        isLoading={isDeleting}
+        onConfirm={async () => {
           if (deleteTarget) {
-            removeActivity(deleteTarget.id);
+            setIsDeleting(true);
+            await removeActivity(deleteTarget.id);
+            setIsDeleting(false);
             setDeleteTarget(null);
           }
         }}

@@ -6,7 +6,7 @@ export interface CurrentWeekCardProps {
   weekNumber: number;
   year: number;
   isLocked: boolean;
-  updatedAt: string; // ISO datetime string for formatRelativeTimestamp
+  updatedAt?: string; // ISO datetime string for formatRelativeTimestamp
 }
 
 export const CurrentWeekCard: React.FC<CurrentWeekCardProps> = ({
@@ -31,9 +31,11 @@ export const CurrentWeekCard: React.FC<CurrentWeekCardProps> = ({
           >
             {isLocked ? 'Concluída' : 'Em andamento'}
           </span>
-          <p className="text-sm text-muted-foreground">
-            Última edição {formatRelativeTimestamp(updatedAt)}
-          </p>
+          {updatedAt && (
+            <p className="text-sm text-muted-foreground">
+              Última edição {formatRelativeTimestamp(updatedAt)}
+            </p>
+          )}
         </div>
         <Link
           to={`/weekly-review/${year}/${weekNumber}`}

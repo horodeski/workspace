@@ -24,6 +24,7 @@ interface EditEntryDialogProps {
 }
 
 export function EditEntryDialog({ entry, onClose, onSave }: EditEntryDialogProps) {
+  const [isSaving, setIsSaving] = React.useState(false);
   const {
     register,
     handleSubmit,
@@ -47,20 +48,26 @@ export function EditEntryDialog({ entry, onClose, onSave }: EditEntryDialogProps
         duration: entry.duration,
         observation: entry.observation,
       });
+      setIsSaving(false);
     }
   }, [entry, reset]);
 
   const onSubmit = async (data: SupportEntryFormData) => {
-    await onSave({
-      date: data.date,
-      description: data.description,
-      duration: data.duration,
-      observation: data.observation ?? '',
-    });
+    setIsSaving(true);
+    try {
+      await onSave({
+        date: data.date,
+        description: data.description,
+        duration: data.duration,
+        observation: data.observation ?? '',
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
-    <Dialog open={entry !== null} onOpenChange={(open: boolean) => { if (!open) onClose(); }}>
+    <Dialog open={entry !== null} onOpenChange={(open: boolean) => { if (!open && !isSaving) onClose(); }}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Editar atividade</DialogTitle>
@@ -75,12 +82,14 @@ export function EditEntryDialog({ entry, onClose, onSave }: EditEntryDialogProps
             placeholder="DD/MM"
             maxLength={5}
             error={errors.date?.message}
+            disabled={isSaving}
           />
           <Input
             {...register('description')}
             label="Descrição"
             placeholder="Ex: Ajudei o Heitor a subir o ambiente"
             error={errors.description?.message}
+            disabled={isSaving}
           />
           <Input
             {...register('duration')}
@@ -88,18 +97,28 @@ export function EditEntryDialog({ entry, onClose, onSave }: EditEntryDialogProps
             placeholder="Ex: 2h"
             maxLength={20}
             error={errors.duration?.message}
+            disabled={isSaving}
           />
           <Input
             {...register('observation')}
             label="Observação"
             placeholder="Ex: foto da ligação"
             error={errors.observation?.message}
+            disabled={isSaving}
           />
           <div className="flex justify-end gap-2 mt-2">
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>
               Cancelar
             </Button>
-            <Button type="submit">Salvar</Button>
+            <Button type="submit" disabled={isSaving}>
+              {isSaving && (
+                <svg className="mr-2 h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              )}
+              Salvar
+            </Button>
           </div>
         </form>
       </DialogContent>
