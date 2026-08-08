@@ -6,18 +6,19 @@ App pessoal de produtividade e organização. Centraliza ferramentas de organiza
 
 | Camada | Tecnologias |
 |--------|-------------|
-| Frontend | React 18, TypeScript, Vite 8, Tailwind CSS, shadcn/ui, Zustand, React Router DOM v7, Tiptap, Framer Motion |
-| Backend | Fastify 5, TypeScript, Prisma ORM, PostgreSQL 16, JWT (access + refresh tokens) |
+| Frontend | React 18, TypeScript, Vite 8, Tailwind CSS, shadcn/ui, Zustand, React Router DOM v7, Tiptap, Framer Motion, React Hook Form, Zod |
+| Backend | Fastify 5, TypeScript, Prisma ORM, PostgreSQL 16, JWT (access + refresh tokens), Zod, Resend (email) |
 | Infra | Docker, Docker Compose, GitHub Actions CI |
-| Testes | Jest + Testing Library (frontend), Vitest (backend) |
+| Testes | Jest (frontend), Vitest (backend) |
 
 ## Funcionalidades
 
-- **Lembretes (Calendário)** — visão mensal com sidebar de atividades, criação/edição de eventos, recorrência
-- **Card de Apoio** — registro de atividades de apoio com anexos, geração de texto formatado para Kanban
-- **Quadros** — canvas freeform com post-its arrastáveis e redimensionáveis, múltiplos quadros
-- **Weekly Review** — revisão semanal com editor rich text, histórico e lock de reviews finalizadas
+- **Lembretes (Calendário)** — visão mensal com sidebar de atividades, criação/edição de eventos, recorrência, prioridades, anexos
+- **Card de Apoio** — registro de atividades de apoio com anexos, geração de texto formatado para Kanban, finalização
+- **Quadros** — canvas freeform com post-its arrastáveis e redimensionáveis, múltiplos quadros por usuário
+- **Weekly Review** — revisão semanal com editor rich text (Tiptap), histórico por semana/ano, lock de reviews finalizadas
 - **Sync** — importação de dados do localStorage e operações offline
+- **Upload de arquivos** — avatar de perfil, anexos em atividades e cards de apoio (JPEG, PNG, WebP)
 
 ## Estrutura do Projeto
 
@@ -128,6 +129,8 @@ npm run dev
 | `RATE_LIMIT_API` | Req/min por user (API) | `100` |
 | `UPLOAD_MAX_SIZE_MB` | Tamanho máximo de upload | `10` |
 | `UPLOAD_DIR` | Diretório de uploads | `./uploads` |
+| `RESEND_API_KEY` | API key do Resend (envio de emails) | — |
+| `RESEND_FROM` | Remetente dos emails | — |
 
 ## CI/CD
 
@@ -151,3 +154,4 @@ docker run -p 3000:3000 --env-file .env workspace-backend
 - [ ] PWA para acesso offline
 - [ ] Habit Tracker
 - [ ] Pomodoro timer integrado
+- [ ] Compartilhamento de quadros entre usuários

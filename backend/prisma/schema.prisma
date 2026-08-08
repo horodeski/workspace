@@ -10,7 +10,10 @@ datasource db {
 model User {
   id              String    @id @default(uuid())
   email           String    @unique
+  name            String    @db.VarChar(100)
+  avatarPath      String?   @db.VarChar(500)
   passwordHash    String
+  emailVerified   Boolean   @default(false)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -19,6 +22,20 @@ model User {
   boards          Board[]
   reviews         Review[]
   refreshTokens   RefreshToken[]
+  emailVerifications EmailVerification[]
+}
+
+model EmailVerification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  code      String   @db.VarChar(6)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([userId, code])
 }
 
 model RefreshToken {

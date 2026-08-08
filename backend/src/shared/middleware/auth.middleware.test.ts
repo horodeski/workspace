@@ -24,7 +24,7 @@ function createMockReply() {
 describe('authMiddleware', () => {
   it('should attach userId when a valid token is provided', async () => {
     const userId = 'user-123';
-    const token = jwt.sign({ userId }, JWT_SECRET, { expiresIn: '15m' });
+    const token = jwt.sign({ userId }, JWT_SECRET, { expiresIn: '15m', issuer: 'workspace-app', audience: 'workspace-api' });
     const request = createMockRequest(`Bearer ${token}`);
     const reply = createMockReply();
 
@@ -51,7 +51,7 @@ describe('authMiddleware', () => {
 
   it('should throw UnauthorizedError with expiration message for expired tokens', async () => {
     const userId = 'user-456';
-    const token = jwt.sign({ userId }, JWT_SECRET, { expiresIn: '-1s' });
+    const token = jwt.sign({ userId }, JWT_SECRET, { expiresIn: '-1s', issuer: 'workspace-app', audience: 'workspace-api' });
     const request = createMockRequest(`Bearer ${token}`);
     const reply = createMockReply();
 

@@ -6,6 +6,7 @@ export const envSchema = z.object({
   DATABASE_URL: z.string().url(),
   JWT_SECRET: z.string().min(32),
   JWT_REFRESH_SECRET: z.string().min(32),
+  BCRYPT_ROUNDS: z.coerce.number().min(10).max(15).default(12),
   CORS_ORIGINS: z.string().transform((s) => s.split(',')),
   LOG_LEVEL: z
     .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace'])
@@ -14,6 +15,8 @@ export const envSchema = z.object({
   RATE_LIMIT_API: z.coerce.number().default(100),
   UPLOAD_MAX_SIZE_MB: z.coerce.number().default(10),
   UPLOAD_DIR: z.string().default('./uploads'),
+  RESEND_API_KEY: z.string().min(1),
+  EMAIL_FROM: z.string().default('onboarding@resend.dev'),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -10,12 +10,15 @@ function createTestEnv(overrides?: Partial<Env>): Env {
     DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
     JWT_SECRET: 'a'.repeat(32),
     JWT_REFRESH_SECRET: 'b'.repeat(32),
+    BCRYPT_ROUNDS: 10,
     CORS_ORIGINS: ['http://localhost:3000'],
     LOG_LEVEL: 'fatal',
     RATE_LIMIT_AUTH: 3, // low limit for testing
     RATE_LIMIT_API: 5,  // low limit for testing
     UPLOAD_MAX_SIZE_MB: 10,
     UPLOAD_DIR: './uploads',
+    RESEND_API_KEY: 'test-resend-key',
+    EMAIL_FROM: 'test@example.com',
     ...overrides,
   } as Env;
 }

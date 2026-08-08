@@ -82,6 +82,7 @@ async function refreshAccessToken(): Promise<boolean> {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken }),
+      credentials: 'include',
     });
 
     if (!res.ok) return false;
@@ -111,14 +112,14 @@ async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
     headers['Authorization'] = `Bearer ${accessToken}`;
   }
 
-  let res = await fetch(`${BASE_URL}${url}`, { ...options, headers });
+  let res = await fetch(`${BASE_URL}${url}`, { ...options, headers, credentials: 'include' });
 
   // On 401, try refreshing the token once
   if (res.status === 401 && refreshToken) {
     const refreshed = await refreshAccessToken();
     if (refreshed) {
       headers['Authorization'] = `Bearer ${accessToken}`;
-      res = await fetch(`${BASE_URL}${url}`, { ...options, headers });
+      res = await fetch(`${BASE_URL}${url}`, { ...options, headers, credentials: 'include' });
     } else {
       clearTokens();
       window.location.reload();

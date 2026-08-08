@@ -1,15 +1,20 @@
 import crypto from 'node:crypto';
+import { subDays } from 'date-fns';
 import { prisma } from '../../shared/database/prisma.js';
 
 export interface CreateUserData {
   email: string;
+  name: string;
   passwordHash: string;
 }
 
 export interface UserRecord {
   id: string;
   email: string;
+  name: string;
+  avatarPath: string | null;
   passwordHash: string;
+  emailVerified: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -44,9 +49,25 @@ export const authRepository = {
     return prisma.user.create({ data });
   },
 
+  async updateUser(id: string, data: { avatarPath?: string }): Promise<void> {
+    await prisma.user.update({ where: { id }, data });
+  },
+
   async findRefreshToken(token: string): Promise<RefreshTokenRecord | null> {
     const tokenHash = hashToken(token);
-    return prisma.refreshToken.findUnique({ where: { token: tokenHash } });
+    const record = await prisma.refreshToken.findUnique({ where: { token: tokenHash } });
+
+    if (!record) return null;
+
+    // Timing-safe verification: compare stored hash with computed hash
+    const storedBuffer = Buffer.from(record.token, 'hex');
+    const computedBuffer = Buffer.from(tokenHash, 'hex');
+
+    if (storedBuffer.length !== computedBuffer.length || !crypto.timingSafeEqual(storedBuffer, computedBuffer)) {
+      return null;
+    }
+
+    return record;
   },
 
   async createRefreshToken(data: { token: string; userId: string; expiresAt: Date }): Promise<RefreshTokenRecord> {
@@ -67,6 +88,56 @@ export const authRepository = {
     await prisma.refreshToken.updateMany({
       where: { userId, revokedAt: null },
       data: { revokedAt: new Date() },
+    });
+  },
+
+  async deleteExpiredTokens(): Promise<number> {
+    const { count } = await prisma.refreshToken.deleteMany({
+      where: {
+        OR: [
+          { expiresAt: { lt: new Date() } },
+          { revokedAt: { not: null }, createdAt: { lt: subDays(new Date(), 7) } },
+        ],
+      },
+    });
+    return count;
+  },
+
+  // Email verification methods
+
+  async createEmailVerification(data: { userId: string; code: string; expiresAt: Date }) {
+    return prisma.emailVerification.create({ data });
+  },
+
+  async findValidVerification(userId: string, code: string) {
+    return prisma.emailVerification.findFirst({
+      where: {
+        userId,
+        code,
+        usedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  },
+
+  async markVerificationUsed(id: string) {
+    await prisma.emailVerification.update({
+      where: { id },
+      data: { usedAt: new Date() },
+    });
+  },
+
+  async setEmailVerified(userId: string) {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { emailVerified: true },
+    });
+  },
+
+  async countRecentVerifications(userId: string, since: Date): Promise<number> {
+    return prisma.emailVerification.count({
+      where: { userId, createdAt: { gt: since } },
     });
   },
 };

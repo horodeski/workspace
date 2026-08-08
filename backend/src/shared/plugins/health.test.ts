@@ -18,6 +18,8 @@ const TEST_ENV: Record<string, string> = {
   JWT_REFRESH_SECRET: 'b'.repeat(32),
   CORS_ORIGINS: 'http://localhost:3000',
   LOG_LEVEL: 'fatal',
+  RESEND_API_KEY: 'test-resend-key',
+  EMAIL_FROM: 'test@example.com',
 };
 
 describe('Health check plugin', () => {
