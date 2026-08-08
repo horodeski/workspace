@@ -4,6 +4,7 @@ import { ClipboardList, Copy, Download, Check, CheckCircle2 } from 'lucide-react
 import { PageHeader } from '../../../components/PageHeader';
 import { EmptyState } from '../../../components/EmptyState';
 import { Button } from '@/components/ui/button';
+import { ConfirmDeleteDialog } from '@/components/ConfirmDeleteDialog';
 import { SupportEntryForm } from '../components/SupportEntryForm';
 import { SupportEntryTable } from '../components/SupportEntryTable';
 import { FormattedTextPreview } from '../components/FormattedTextPreview';
@@ -21,14 +22,22 @@ function downloadDataUrl(dataUrl: string, filename: string) {
 }
 
 export const RoutinePage: React.FC = () => {
-  const { entries, formattedText, addEntry, updateEntry, removeEntry, clearEntries, getFormattedText, getAllAttachments, fetchEntries } =
+  const { entries, formattedText, isLoading, addEntry, updateEntry, removeEntry, clearEntries, getFormattedText, getAllAttachments, fetchEntries } =
     useSupportCardStore();
 
   const [copied, setCopied] = React.useState(false);
   const [editingEntry, setEditingEntry] = React.useState<SupportEntry | null>(null);
+  const [deleteTarget, setDeleteTarget] = React.useState<SupportEntry | null>(null);
+  const [isDeleting, setIsDeleting] = React.useState(false);
+  const [showFinalizeConfirm, setShowFinalizeConfirm] = React.useState(false);
+  const [isFinalizing, setIsFinalizing] = React.useState(false);
+  const [initialLoad, setInitialLoad] = React.useState(true);
+  const fetched = React.useRef(false);
 
   React.useEffect(() => {
-    fetchEntries();
+    if (fetched.current) return;
+    fetched.current = true;
+    fetchEntries().finally(() => setInitialLoad(false));
   }, [fetchEntries]);
 
   React.useEffect(() => {
@@ -36,6 +45,17 @@ export const RoutinePage: React.FC = () => {
       getFormattedText();
     }
   }, [entries, getFormattedText]);
+
+  const totalAttachments = entries.reduce((sum, e) => sum + (e.attachments?.length ?? 0), 0);
+
+  if (initialLoad && isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-zinc-500 gap-3">
+        <div className="animate-spin h-6 w-6 border-2 border-zinc-400 border-t-transparent rounded-full" />
+        <span className="text-sm">Carregando...</span>
+      </div>
+    );
+  }
 
   const handleCopyText = async () => {
     const text = await getFormattedText();
@@ -55,14 +75,16 @@ export const RoutinePage: React.FC = () => {
     }
   };
 
-  const handleFinalize = async () => {
-    if (!confirm('Tem certeza que deseja finalizar o card de apoio? Todos os registros e anexos serão apagados.')) {
-      return;
-    }
-    await clearEntries();
+  const handleFinalize = () => {
+    setShowFinalizeConfirm(true);
   };
 
-  const totalAttachments = entries.reduce((sum, e) => sum + (e.attachments?.length ?? 0), 0);
+  const handleConfirmFinalize = async () => {
+    setIsFinalizing(true);
+    await clearEntries();
+    setIsFinalizing(false);
+    setShowFinalizeConfirm(false);
+  };
 
   return (
     <div className="space-y-6">
@@ -122,7 +144,10 @@ export const RoutinePage: React.FC = () => {
         <>
           <SupportEntryTable
             entries={entries}
-            onRemove={removeEntry}
+            onRemove={async (id) => {
+              const entry = entries.find((e) => e.id === id);
+              if (entry) setDeleteTarget(entry);
+            }}
             onEdit={setEditingEntry}
           />
           <FormattedTextPreview
@@ -142,6 +167,30 @@ export const RoutinePage: React.FC = () => {
             setEditingEntry(null);
           }
         }}
+      />
+
+      <ConfirmDeleteDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+        title={deleteTarget?.description || ''}
+        isLoading={isDeleting}
+        onConfirm={async () => {
+          if (deleteTarget) {
+            setIsDeleting(true);
+            await removeEntry(deleteTarget.id);
+            setIsDeleting(false);
+            setDeleteTarget(null);
+          }
+        }}
+      />
+
+      <ConfirmDeleteDialog
+        open={showFinalizeConfirm}
+        onOpenChange={(open) => { if (!open) setShowFinalizeConfirm(false); }}
+        title="card de apoio"
+        description="Tem certeza que deseja finalizar o card de apoio? Todos os registros e anexos serão apagados."
+        isLoading={isFinalizing}
+        onConfirm={handleConfirmFinalize}
       />
     </div>
   );

@@ -10,6 +10,7 @@ import type { BoardItem, BoardItemType } from '../types/board.types';
 export interface PostItCardProps {
   item: BoardItem;
   zIndex: number;
+  zoom?: number;
   onEdit: (item: BoardItem) => void;
   onDelete: (id: string) => void;
   onBringToFront: (id: string) => void;
@@ -34,6 +35,7 @@ const TYPE_ICONS: Record<BoardItemType, React.ElementType> = {
 export const PostItCard: React.FC<PostItCardProps> = ({
   item,
   zIndex,
+  zoom = 1,
   onEdit,
   onDelete,
   onBringToFront,
@@ -43,12 +45,14 @@ export const PostItCard: React.FC<PostItCardProps> = ({
   const [isHovered, setIsHovered] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
 
   const { isDragging, currentPosition, handlePointerDown } = useDragInteraction({
     itemId: item.id,
     initialPosition: item.position,
     canvasSize: { width: CANVAS_WIDTH, height: CANVAS_HEIGHT },
     cardSize: item.size,
+    zoom,
     onDragEnd: (id, pos) => onUpdatePosition(id, pos),
     onBringToFront,
   });
@@ -60,6 +64,7 @@ export const PostItCard: React.FC<PostItCardProps> = ({
       initialSize: item.size,
       initialPosition: item.position,
       canvasSize: { width: CANVAS_WIDTH, height: CANVAS_HEIGHT },
+      zoom,
       onResizeEnd: (id, size, pos) => {
         onUpdateSize(id, size);
         onUpdatePosition(id, pos);
@@ -91,6 +96,15 @@ export const PostItCard: React.FC<PostItCardProps> = ({
 
   const handleImageError = useCallback(() => {
     setImageError(true);
+  }, []);
+
+  const handleImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    if (img.naturalWidth === 0 || img.naturalHeight === 0) {
+      setImageError(true);
+    } else {
+      setImageLoaded(true);
+    }
   }, []);
 
   return (
@@ -173,14 +187,22 @@ export const PostItCard: React.FC<PostItCardProps> = ({
                 <span className="text-xs text-center">Imagem não pôde ser carregada</span>
               </div>
             ) : (
-              <img
-                src={item.content}
-                alt={`Image card ${item.id}`}
-                className="w-full h-full rounded"
-                style={{ objectFit: 'cover', objectPosition: 'center' }}
-                onError={handleImageError}
-                referrerPolicy="no-referrer"
-              />
+              <>
+                {!imageLoaded && (
+                  <div className="flex items-center justify-center h-full text-gray-400">
+                    <div className="animate-pulse h-6 w-6 rounded-full bg-gray-300" />
+                  </div>
+                )}
+                <img
+                  src={item.content}
+                  alt={`Image card ${item.id}`}
+                  className={`w-full h-full rounded ${imageLoaded ? '' : 'hidden'}`}
+                  style={{ objectFit: 'cover', objectPosition: 'center' }}
+                  onError={handleImageError}
+                  onLoad={handleImageLoad}
+                  referrerPolicy="no-referrer"
+                />
+              </>
             )
           ) : (
             <p className="text-sm text-gray-800 whitespace-pre-wrap line-clamp-6 overflow-hidden">

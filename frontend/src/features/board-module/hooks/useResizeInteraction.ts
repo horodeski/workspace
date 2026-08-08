@@ -14,6 +14,7 @@ interface UseResizeInteractionOptions {
   initialSize: { width: number; height: number };
   initialPosition: { x: number; y: number };
   canvasSize: { width: number; height: number };
+  zoom?: number;
   onResizeEnd: (
     id: string,
     size: { width: number; height: number },
@@ -149,7 +150,7 @@ export function computeResizeFromDelta(
 export function useResizeInteraction(
   options: UseResizeInteractionOptions
 ): UseResizeInteractionReturn {
-  const { itemId, itemType, initialSize, initialPosition, onResizeEnd } =
+  const { itemId, itemType, initialSize, initialPosition, zoom = 1, onResizeEnd } =
     options;
 
   const [isResizing, setIsResizing] = useState(false);
@@ -183,6 +184,9 @@ export function useResizeInteraction(
   const itemTypeRef = useRef(itemType);
   itemTypeRef.current = itemType;
 
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
+
   // Refs to track resize state across pointer events
   const startPointerRef = useRef({ x: 0, y: 0 });
   const startSizeRef = useRef({ width: 0, height: 0 });
@@ -196,8 +200,8 @@ export function useResizeInteraction(
     (e: PointerEvent) => {
       if (!isResizingRef.current || !activeHandleRef.current) return;
 
-      const deltaX = e.clientX - startPointerRef.current.x;
-      const deltaY = e.clientY - startPointerRef.current.y;
+      const deltaX = (e.clientX - startPointerRef.current.x) / zoomRef.current;
+      const deltaY = (e.clientY - startPointerRef.current.y) / zoomRef.current;
 
       const result = computeResizeFromDelta(
         activeHandleRef.current,
@@ -238,8 +242,8 @@ export function useResizeInteraction(
       }
 
       // Compute final result
-      const deltaX = e.clientX - startPointerRef.current.x;
-      const deltaY = e.clientY - startPointerRef.current.y;
+      const deltaX = (e.clientX - startPointerRef.current.x) / zoomRef.current;
+      const deltaY = (e.clientY - startPointerRef.current.y) / zoomRef.current;
 
       const result = computeResizeFromDelta(
         activeHandleRef.current,

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import { ConfirmDeleteDialog } from '@/components/ConfirmDeleteDialog';
 import { useBoardModuleStore } from '../hooks/useBoardModuleStore';
 import { BoardBar } from '../components/BoardBar';
 import { FilterBar } from '../components/FilterBar';
@@ -25,6 +26,8 @@ export const BoardModulePage: React.FC = () => {
     boards,
     activeBoard,
     activeBoardId,
+    isLoading,
+    isSwitchingBoard,
     createBoard,
     renameBoard,
     deleteBoard,
@@ -42,6 +45,8 @@ export const BoardModulePage: React.FC = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<BoardItem | null>(null);
   const [boardToDelete, setBoardToDelete] = useState<string | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+  const [isDeletingItem, setIsDeletingItem] = useState(false);
   const [isCreateBoardOpen, setIsCreateBoardOpen] = useState(false);
   const [newBoardName, setNewBoardName] = useState('');
   const [createBoardError, setCreateBoardError] = useState<string | null>(null);
@@ -49,10 +54,16 @@ export const BoardModulePage: React.FC = () => {
   const [renameBoardId, setRenameBoardId] = useState<string | null>(null);
   const [renameBoardValue, setRenameBoardValue] = useState('');
   const [renameBoardError, setRenameBoardError] = useState<string | null>(null);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [isDeletingBoard, setIsDeletingBoard] = useState(false);
+  const [initialLoad, setInitialLoad] = useState(true);
+  const fetched = useRef(false);
 
   // Fetch boards on mount
   useEffect(() => {
-    fetchBoards();
+    if (fetched.current) return;
+    fetched.current = true;
+    fetchBoards().finally(() => setInitialLoad(false));
   }, [fetchBoards]);
 
   const activeFilter = getActiveFilter();
@@ -70,6 +81,21 @@ export const BoardModulePage: React.FC = () => {
   }, [activeBoard]);
 
   const canDelete = boards.length > 1;
+
+  const boardToDeleteName = useMemo(() => {
+    if (!boardToDelete) return '';
+    const board = boards.find((b) => b.id === boardToDelete);
+    return board?.name ?? '';
+  }, [boardToDelete, boards]);
+
+  if (initialLoad && isLoading) {
+    return (
+      <div className="flex flex-col h-full items-center justify-center text-zinc-500 gap-3">
+        <div className="animate-spin h-6 w-6 border-2 border-zinc-400 border-t-transparent rounded-full" />
+        <span className="text-sm">Carregando...</span>
+      </div>
+    );
+  }
 
   const handleCreateBoard = () => {
     setNewBoardName('');
@@ -103,7 +129,9 @@ export const BoardModulePage: React.FC = () => {
 
   const handleConfirmRename = async () => {
     if (!renameBoardId) return;
+    setIsRenaming(true);
     const result = await renameBoard(renameBoardId, renameBoardValue);
+    setIsRenaming(false);
     if (result.success) {
       setIsRenameBoardOpen(false);
       setRenameBoardId(null);
@@ -114,9 +142,11 @@ export const BoardModulePage: React.FC = () => {
     }
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (boardToDelete) {
-      deleteBoard(boardToDelete);
+      setIsDeletingBoard(true);
+      await deleteBoard(boardToDelete);
+      setIsDeletingBoard(false);
       setBoardToDelete(null);
     }
   };
@@ -142,7 +172,7 @@ export const BoardModulePage: React.FC = () => {
   };
 
   const handleDeleteItem = (id: string) => {
-    removeItem(id);
+    setItemToDelete(id);
   };
 
   const handleFormSubmit = (data: BoardItemFormData) => {
@@ -159,12 +189,6 @@ export const BoardModulePage: React.FC = () => {
     setIsFormOpen(false);
     setEditingItem(null);
   };
-
-  const boardToDeleteName = useMemo(() => {
-    if (!boardToDelete) return '';
-    const board = boards.find((b) => b.id === boardToDelete);
-    return board?.name ?? '';
-  }, [boardToDelete, boards]);
 
   return (
     <div className="flex flex-col h-full">
@@ -187,15 +211,22 @@ export const BoardModulePage: React.FC = () => {
         </Button>
       </div>
 
-      <FreeformCanvas
-        items={filteredItems}
-        emptyVariant={emptyVariant}
-        onEdit={handleEditItem}
-        onDelete={handleDeleteItem}
-        onAddItem={handleAddItem}
-        onUpdatePosition={updatePosition}
-        onUpdateSize={updateSize}
-      />
+      {!initialLoad && isSwitchingBoard ? (
+        <div className="flex flex-1 items-center justify-center text-zinc-500 gap-3">
+          <div className="animate-spin h-5 w-5 border-2 border-zinc-400 border-t-transparent rounded-full" />
+          <span className="text-sm">Carregando quadro...</span>
+        </div>
+      ) : (
+        <FreeformCanvas
+          items={filteredItems}
+          emptyVariant={emptyVariant}
+          onEdit={handleEditItem}
+          onDelete={handleDeleteItem}
+          onAddItem={handleAddItem}
+          onUpdatePosition={updatePosition}
+          onUpdateSize={updateSize}
+        />
+      )}
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent>
@@ -222,42 +253,18 @@ export const BoardModulePage: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      <Dialog
+      <ConfirmDeleteDialog
         open={boardToDelete !== null}
-        onOpenChange={(open) => {
-          if (!open) handleCancelDelete();
-        }}
-      >
-        <DialogContent data-testid="confirm-delete-dialog">
-          <DialogHeader>
-            <DialogTitle>Excluir quadro</DialogTitle>
-            <DialogDescription>
-              Tem certeza que deseja excluir o quadro &quot;{boardToDeleteName}
-              &quot;? Esta ação é permanente e não pode ser desfeita.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-end gap-2 mt-4">
-            <Button
-              variant="default"
-              onClick={handleCancelDelete}
-              data-testid="cancel-delete-button"
-            >
-              Cancelar
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleConfirmDelete}
-              data-testid="confirm-delete-button"
-            >
-              Excluir
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+        onOpenChange={(open) => { if (!open) handleCancelDelete(); }}
+        title={boardToDeleteName}
+        description={`Tem certeza que deseja excluir o quadro "${boardToDeleteName}"? Esta ação é permanente e não pode ser desfeita.`}
+        onConfirm={handleConfirmDelete}
+        isLoading={isDeletingBoard}
+      />
 
       <Dialog
         open={isCreateBoardOpen}
-        onOpenChange={(open) => {
+        onOpenChange={(open: boolean) => {
           if (!open) {
             setIsCreateBoardOpen(false);
             setNewBoardName('');
@@ -317,7 +324,8 @@ export const BoardModulePage: React.FC = () => {
 
       <Dialog
         open={isRenameBoardOpen}
-        onOpenChange={(open) => {
+        onOpenChange={(open: boolean) => {
+          if (isRenaming) return;
           if (!open) {
             setIsRenameBoardOpen(false);
             setRenameBoardId(null);
@@ -326,7 +334,7 @@ export const BoardModulePage: React.FC = () => {
           }
         }}
       >
-        <DialogContent data-testid="rename-board-dialog">
+        <DialogContent data-testid="rename-board-dialog" onInteractOutside={(e: Event) => { if (isRenaming) e.preventDefault(); }}>
           <DialogHeader>
             <DialogTitle>Renomear quadro</DialogTitle>
             <DialogDescription>
@@ -339,6 +347,7 @@ export const BoardModulePage: React.FC = () => {
               id="rename-board-name"
               data-testid="rename-board-input"
               value={renameBoardValue}
+              disabled={isRenaming}
               onChange={(e) => {
                 setRenameBoardValue(e.target.value);
                 setRenameBoardError(null);
@@ -361,6 +370,7 @@ export const BoardModulePage: React.FC = () => {
           <DialogFooter>
             <Button
               variant="default"
+              disabled={isRenaming}
               onClick={() => {
                 setIsRenameBoardOpen(false);
                 setRenameBoardId(null);
@@ -370,12 +380,34 @@ export const BoardModulePage: React.FC = () => {
             >
               Cancelar
             </Button>
-            <Button onClick={handleConfirmRename} data-testid="rename-board-confirm">
+            <Button onClick={handleConfirmRename} disabled={isRenaming} data-testid="rename-board-confirm">
+              {isRenaming && (
+                <svg className="mr-2 h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              )}
               Renomear
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDeleteDialog
+        open={itemToDelete !== null}
+        onOpenChange={(open) => { if (!open) setItemToDelete(null); }}
+        title="item"
+        description="Tem certeza que deseja excluir este item? Esta ação não pode ser desfeita."
+        isLoading={isDeletingItem}
+        onConfirm={async () => {
+          if (itemToDelete) {
+            setIsDeletingItem(true);
+            await removeItem(itemToDelete);
+            setIsDeletingItem(false);
+            setItemToDelete(null);
+          }
+        }}
+      />
     </div>
   );
 };

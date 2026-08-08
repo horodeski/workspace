@@ -32,6 +32,7 @@ export interface BoardModuleState {
   activeBoardId: string | null;
   filters: Record<string, BoardFilter>;
   isLoading: boolean;
+  isSwitchingBoard: boolean;
   error: string | null;
 
   // Board actions
@@ -61,6 +62,7 @@ export const useBoardModuleStore = create<BoardModuleState>()((set, get) => ({
   activeBoardId: null,
   filters: {},
   isLoading: false,
+  isSwitchingBoard: false,
   error: null,
 
   fetchBoards: async () => {
@@ -84,15 +86,15 @@ export const useBoardModuleStore = create<BoardModuleState>()((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const board = await api.get<BoardSummary & { items: BoardItem[] }>(`/boards/${id}`);
-      set({ activeBoard: board, isLoading: false });
+      set({ activeBoard: board, isLoading: false, isSwitchingBoard: false });
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : 'Failed to fetch board';
-      set({ error: message, isLoading: false });
+      set({ error: message, isLoading: false, isSwitchingBoard: false });
     }
   },
 
   setActiveBoard: (id: string) => {
-    set({ activeBoardId: id });
+    set({ activeBoardId: id, isSwitchingBoard: true });
     get().fetchBoard(id);
   },
 
