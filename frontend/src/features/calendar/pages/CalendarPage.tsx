@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useCalendarStore } from '../hooks/useCalendarStore';
 import { CalendarMonth } from '../components/Calendar/CalendarMonth';
 import { ActivitySidebar } from '../components/ActivitySidebar';
@@ -12,8 +12,18 @@ const DEFAULT_SIDEBAR_WIDTH = 340;
 export function CalendarPage() {
   const selectedDate = useCalendarStore((state) => state.selectedDate);
   const getEventsForMonth = useCalendarStore((state) => state.getEventsForMonth);
+  const isLoading = useCalendarStore((state) => state.isLoading);
+  const fetchActivitiesForDate = useCalendarStore((state) => state.fetchActivitiesForDate);
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
+  const [initialLoad, setInitialLoad] = useState(true);
   const isResizing = useRef(false);
+  const fetched = useRef(false);
+
+  useEffect(() => {
+    if (fetched.current) return;
+    fetched.current = true;
+    fetchActivitiesForDate(selectedDate).finally(() => setInitialLoad(false));
+  }, [fetchActivitiesForDate, selectedDate]);
 
   const events = getEventsForMonth(selectedDate);
 
@@ -44,6 +54,15 @@ export function CalendarPage() {
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
   }, [sidebarWidth]);
+
+  if (initialLoad && isLoading) {
+    return (
+      <div className="flex h-full items-center justify-center text-zinc-500 gap-3">
+        <div className="animate-spin h-6 w-6 border-2 border-zinc-400 border-t-transparent rounded-full" />
+        <span className="text-sm">Carregando...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full">

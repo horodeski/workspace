@@ -7,7 +7,6 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 
 interface SidebarItem {
@@ -33,29 +32,22 @@ export function AppSidebar() {
 
         <nav className="flex flex-1 flex-col gap-1" aria-label="Navegação principal">
           {sidebarItems.map((item) => (
-            <Button
+            <NavLink
               key={item.path}
-              variant="ghost"
-              asChild
-              className={cn(
-                'w-full justify-start gap-3',
-              )}
+              to={item.path}
+              end={item.path === '/'}
+              className={({ isActive }) =>
+                cn(
+                  'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                  isActive
+                    ? 'bg-accent text-accent-foreground'
+                    : 'text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground'
+                )
+              }
             >
-              <NavLink
-                to={item.path}
-                end={item.path === '/'}
-                className={({ isActive }) =>
-                  cn(
-                    isActive
-                      ? 'bg-accent text-accent-foreground'
-                      : 'text-muted-foreground'
-                  )
-                }
-              >
-                <item.icon className="h-4 w-4 shrink-0" />
-                <span>{item.label}</span>
-              </NavLink>
-            </Button>
+              <item.icon className="h-4 w-4 shrink-0" />
+              <span>{item.label}</span>
+            </NavLink>
           ))}
         </nav>
 

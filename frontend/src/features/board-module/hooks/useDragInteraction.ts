@@ -5,6 +5,7 @@ interface UseDragInteractionOptions {
   initialPosition: { x: number; y: number };
   canvasSize: { width: number; height: number };
   cardSize: { width: number; height: number };
+  zoom?: number;
   onDragEnd: (id: string, position: { x: number; y: number }) => void;
   onBringToFront: (id: string) => void;
 }
@@ -18,7 +19,7 @@ interface UseDragInteractionReturn {
 export function useDragInteraction(
   options: UseDragInteractionOptions
 ): UseDragInteractionReturn {
-  const { itemId, initialPosition, canvasSize, cardSize, onDragEnd, onBringToFront } =
+  const { itemId, initialPosition, canvasSize, cardSize, zoom = 1, onDragEnd, onBringToFront } =
     options;
 
   const [isDragging, setIsDragging] = useState(false);
@@ -39,6 +40,9 @@ export function useDragInteraction(
 
   const cardSizeRef = useRef(cardSize);
   cardSizeRef.current = cardSize;
+
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
 
   const itemIdRef = useRef(itemId);
   itemIdRef.current = itemId;
@@ -70,8 +74,8 @@ export function useDragInteraction(
     (e: PointerEvent) => {
       if (!isDraggingRef.current) return;
 
-      const deltaX = e.clientX - startPointerRef.current.x;
-      const deltaY = e.clientY - startPointerRef.current.y;
+      const deltaX = (e.clientX - startPointerRef.current.x) / zoomRef.current;
+      const deltaY = (e.clientY - startPointerRef.current.y) / zoomRef.current;
 
       const newPosition = {
         x: startPositionRef.current.x + deltaX,
@@ -102,15 +106,20 @@ export function useDragInteraction(
       setIsDragging(false);
 
       // Compute final position
-      const deltaX = e.clientX - startPointerRef.current.x;
-      const deltaY = e.clientY - startPointerRef.current.y;
+      const deltaX = (e.clientX - startPointerRef.current.x) / zoomRef.current;
+      const deltaY = (e.clientY - startPointerRef.current.y) / zoomRef.current;
       const finalPosition = clamp({
         x: startPositionRef.current.x + deltaX,
         y: startPositionRef.current.y + deltaY,
       });
 
       setCurrentPosition(finalPosition);
-      onDragEndRef.current(itemIdRef.current, finalPosition);
+
+      // Only notify if position actually changed (avoid request on simple click)
+      const startPos = startPositionRef.current;
+      if (finalPosition.x !== startPos.x || finalPosition.y !== startPos.y) {
+        onDragEndRef.current(itemIdRef.current, finalPosition);
+      }
     },
     [clamp, handlePointerMove]
   );

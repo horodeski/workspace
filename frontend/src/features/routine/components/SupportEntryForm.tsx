@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useForm, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 
@@ -14,6 +15,7 @@ interface SupportEntryFormProps {
 }
 
 export function SupportEntryForm({ onAdd }: SupportEntryFormProps) {
+  const [isSaving, setIsSaving] = useState(false);
   const {
     register,
     handleSubmit,
@@ -31,19 +33,24 @@ export function SupportEntryForm({ onAdd }: SupportEntryFormProps) {
   });
 
   const onSubmit = async (data: SupportEntryFormData) => {
-    await onAdd({
-      date: data.date,
-      description: data.description,
-      duration: data.duration,
-      observation: data.observation ?? '',
-    });
-    reset({
-      date: new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
-      description: '',
-      duration: '',
-      observation: '',
-    });
-    setFocus('description');
+    setIsSaving(true);
+    try {
+      await onAdd({
+        date: data.date,
+        description: data.description,
+        duration: data.duration,
+        observation: data.observation ?? '',
+      });
+      reset({
+        date: new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+        description: '',
+        duration: '',
+        observation: '',
+      });
+      setFocus('description');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -59,12 +66,14 @@ export function SupportEntryForm({ onAdd }: SupportEntryFormProps) {
             placeholder="DD/MM"
             maxLength={5}
             error={errors.date?.message}
+            disabled={isSaving}
           />
           <Input
             {...register('description')}
             label="Descrição"
             placeholder="Ex: Ajudei o Heitor a subir o ambiente"
             error={errors.description?.message}
+            disabled={isSaving}
           />
           <Input
             {...register('duration')}
@@ -72,18 +81,26 @@ export function SupportEntryForm({ onAdd }: SupportEntryFormProps) {
             placeholder="Ex: 2h"
             maxLength={20}
             error={errors.duration?.message}
+            disabled={isSaving}
           />
           <Input
             {...register('observation')}
             label="Observação"
             placeholder="Ex: foto da ligação"
             error={errors.observation?.message}
+            disabled={isSaving}
           />
           <div className="flex flex-col gap-1.5">
             <span className="text-sm font-medium text-transparent select-none">
               _
             </span>
-            <Button type="submit" size="sm">
+            <Button type="submit" size="sm" disabled={isSaving}>
+              {isSaving && (
+                <svg className="mr-2 h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              )}
               Adicionar
             </Button>
           </div>

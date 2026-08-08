@@ -4,12 +4,51 @@ const REFRESH_TOKEN_KEY = 'refresh_token';
 
 let accessToken: string | null = localStorage.getItem(ACCESS_TOKEN_KEY);
 let refreshToken: string | null = localStorage.getItem(REFRESH_TOKEN_KEY);
+let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+// Margin in seconds before token expiry to trigger proactive refresh
+const REFRESH_MARGIN_SECONDS = 60;
+
+function getTokenExpiry(token: string): number | null {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.exp ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function scheduleProactiveRefresh() {
+  if (refreshTimer) {
+    clearTimeout(refreshTimer);
+    refreshTimer = null;
+  }
+
+  if (!accessToken) return;
+
+  const exp = getTokenExpiry(accessToken);
+  if (!exp) return;
+
+  const now = Math.floor(Date.now() / 1000);
+  const delay = (exp - now - REFRESH_MARGIN_SECONDS) * 1000;
+
+  if (delay <= 0) {
+    // Token already near expiry, refresh immediately
+    refreshAccessToken();
+    return;
+  }
+
+  refreshTimer = setTimeout(() => {
+    refreshAccessToken();
+  }, delay);
+}
 
 export function setTokens(access: string, refresh: string) {
   accessToken = access;
   refreshToken = refresh;
   localStorage.setItem(ACCESS_TOKEN_KEY, access);
   localStorage.setItem(REFRESH_TOKEN_KEY, refresh);
+  scheduleProactiveRefresh();
 }
 
 export function clearTokens() {
@@ -17,6 +56,10 @@ export function clearTokens() {
   refreshToken = null;
   localStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
+  if (refreshTimer) {
+    clearTimeout(refreshTimer);
+    refreshTimer = null;
+  }
 }
 
 export function getAccessToken() {
@@ -50,6 +93,9 @@ async function refreshAccessToken(): Promise<boolean> {
     return false;
   }
 }
+
+// Bootstrap: schedule refresh for token already in storage on page load
+scheduleProactiveRefresh();
 
 async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = {
