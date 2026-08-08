@@ -1,20 +1,9 @@
-import { ReactNode, createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { ReactNode, useEffect, useState, useCallback } from 'react';
 import { autoLogin } from '../lib/auth';
 import { getAccessToken, clearTokens, getRefreshToken, api } from '../lib/api';
 import { LoginPage } from './LoginPage';
 import { VerifyEmailPage } from './VerifyEmailPage';
-
-interface AuthContextValue {
-  logout: () => void;
-  user: { name: string; avatarUrl: string | null } | null;
-  refreshUser: () => Promise<void>;
-}
-
-const AuthContext = createContext<AuthContextValue>({ logout: () => {}, user: null, refreshUser: async () => {} });
-
-export function useAuth() {
-  return useContext(AuthContext);
-}
+import { AuthContext } from './AuthContext';
 
 interface AuthProviderProps {
   children: ReactNode;
@@ -41,7 +30,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       localStorage.setItem(USER_NAME_KEY, profile.name);
       if (profile.avatarUrl) localStorage.setItem(USER_AVATAR_KEY, profile.avatarUrl);
       else localStorage.removeItem(USER_AVATAR_KEY);
-    } catch {}
+    } catch (error) {
+      console.error('Failed to refresh user profile:', error);
+    }
   }, []);
 
   const logout = useCallback(() => {
@@ -94,7 +85,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
           setUser({ name: profile.name, avatarUrl: profile.avatarUrl });
           localStorage.setItem(USER_NAME_KEY, profile.name);
           if (profile.avatarUrl) localStorage.setItem(USER_AVATAR_KEY, profile.avatarUrl);
-        } catch {}
+        } catch (error) {
+          console.error('Failed to fetch user profile after autoLogin:', error);
+        }
       }
       setIsReady(true);
     }).catch(() => {

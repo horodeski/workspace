@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Separator } from '@/components/ui/separator';
-import { useAuth } from '@/app/AuthProvider';
+import { useAuth } from '@/app/useAuth';
 
 interface SidebarItem {
   label: string;

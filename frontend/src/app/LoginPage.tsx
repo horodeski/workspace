@@ -52,7 +52,9 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
           body: formData,
           credentials: 'include',
         });
-      } catch {}
+      } catch (error) {
+        console.error('Failed to upload avatar:', error);
+      }
     }
 
     try {
