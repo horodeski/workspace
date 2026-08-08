@@ -1,49 +1,99 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Input } from '../components/Input';
 import { Button } from '../components/Button';
-import { api, setTokens } from '../lib/api';
+import { api, setTokens, getAccessToken } from '../lib/api';
+import { User } from 'lucide-react';
 
 interface AuthResponse {
   accessToken: string;
   refreshToken: string;
+  emailVerified?: boolean;
+  user?: { name: string; avatarUrl: string | null };
 }
 
 interface LoginPageProps {
-  onSuccess: () => void;
+  onSuccess: (verified?: boolean, user?: { name: string; avatarUrl: string | null }) => void;
 }
 
 export function LoginPage({ onSuccess }: LoginPageProps) {
   const [isRegister, setIsRegister] = useState(false);
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAvatarFile(file);
+    const url = URL.createObjectURL(file);
+    setAvatarPreview(url);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
     setIsLoading(true);
 
+    async function uploadAvatar(file: File) {
+      const formData = new FormData();
+      formData.append('file', file);
+      const baseUrl = import.meta.env.VITE_API_URL
+        ? `${import.meta.env.VITE_API_URL}/api/v1`
+        : '/api/v1';
+      try {
+        await fetch(`${baseUrl}/auth/avatar`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${getAccessToken()}` },
+          body: formData,
+          credentials: 'include',
+        });
+      } catch (error) {
+        console.error('Failed to upload avatar:', error);
+      }
+    }
+
     try {
       const endpoint = isRegister ? '/auth/register' : '/auth/login';
-      const data = await api.post<AuthResponse>(endpoint, { email, password });
+      const body = isRegister ? { name, email, password } : { email, password };
+      const data = await api.post<AuthResponse>(endpoint, body);
 
       if (data.accessToken && data.refreshToken) {
         setTokens(data.accessToken, data.refreshToken);
-        onSuccess();
+        // Upload avatar after login if provided
+        if (avatarFile) {
+          await uploadAvatar(avatarFile);
+          // Fetch updated profile so avatar URL is available
+          const profile = await api.get<{ name: string; avatarUrl: string | null }>('/auth/me');
+          onSuccess(data.emailVerified, profile);
+        } else {
+          onSuccess(data.emailVerified, data.user);
+        }
       } else if (isRegister) {
         // Register succeeded but may not return tokens — try login
         const loginData = await api.post<AuthResponse>('/auth/login', { email, password });
         setTokens(loginData.accessToken, loginData.refreshToken);
-        onSuccess();
+        if (avatarFile) {
+          await uploadAvatar(avatarFile);
+          const profile = await api.get<{ name: string; avatarUrl: string | null }>('/auth/me');
+          onSuccess(loginData.emailVerified, profile);
+        } else {
+          onSuccess(loginData.emailVerified, loginData.user);
+        }
       }
     } catch (err: unknown) {
       if (err && typeof err === 'object' && 'status' in err) {
-        const apiErr = err as { status: number; message: string };
+        const apiErr = err as { status: number; message: string; body?: { details?: { message: string }[] } };
         if (apiErr.status === 409) {
           setError('Email já cadastrado.');
         } else if (apiErr.status === 401) {
           setError('Email ou senha incorretos.');
+        } else if (apiErr.status === 400 && apiErr.body?.details?.length) {
+          setError(apiErr.body.details.map((d) => d.message).join('. '));
         } else {
           setError(apiErr.message || 'Erro ao processar requisição.');
         }
@@ -70,6 +120,46 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {isRegister && (
+            <>
+              <div className="flex flex-col items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="relative h-20 w-20 rounded-full overflow-hidden border-2 border-dashed border-muted-foreground/30 hover:border-muted-foreground/60 transition-colors"
+                >
+                  {avatarPreview ? (
+                    <img src={avatarPreview} alt="Avatar" className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-muted">
+                      <User className="h-8 w-8 text-muted-foreground" />
+                    </div>
+                  )}
+                </button>
+                <span className="text-xs text-muted-foreground">Foto de perfil (opcional)</span>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={handleAvatarChange}
+                  className="hidden"
+                />
+              </div>
+
+              <Input
+                label="Nome"
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Seu nome"
+                required
+                minLength={2}
+                maxLength={100}
+                autoComplete="name"
+              />
+            </>
+          )}
+
           <Input
             label="Email"
             type="email"

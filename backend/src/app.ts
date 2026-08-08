@@ -1,5 +1,6 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
+import cookie from '@fastify/cookie';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import multipart from '@fastify/multipart';
@@ -65,6 +66,9 @@ export async function buildApp(options?: AppOptions): Promise<FastifyInstance> {
 
   // 3. Global API rate limiter for authenticated domain routes (per userId, 100 req/min)
   await app.register(apiRateLimitPlugin);
+
+  // Cookie parser (required for httpOnly refresh token cookies)
+  await app.register(cookie);
 
   // 4. CORS
   await app.register(cors, {

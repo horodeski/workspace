@@ -7,6 +7,7 @@ describe('envSchema', () => {
     JWT_SECRET: 'a'.repeat(32),
     JWT_REFRESH_SECRET: 'b'.repeat(32),
     CORS_ORIGINS: 'http://localhost:3000,http://localhost:5173',
+    RESEND_API_KEY: 'test-resend-key',
   };
 
   it('parses valid environment with all required variables', () => {
@@ -131,6 +132,7 @@ describe('loadEnv', () => {
     process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
     process.env.CORS_ORIGINS = 'http://localhost:3000';
     process.env.NODE_ENV = 'development';
+    process.env.RESEND_API_KEY = 'test-resend-key';
 
     const env = loadEnv();
     expect(env.DATABASE_URL).toBe('postgresql://user:pass@localhost:5432/db');

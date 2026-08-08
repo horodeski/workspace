@@ -25,7 +25,10 @@ export async function authMiddleware(request: FastifyRequest, _reply: FastifyRep
 
   try {
     const secret = (request.server as unknown as { env: { JWT_SECRET: string } }).env.JWT_SECRET;
-    const decoded = jwt.verify(token, secret) as JwtPayload;
+    const decoded = jwt.verify(token, secret, {
+      issuer: 'workspace-app',
+      audience: 'workspace-api',
+    }) as JwtPayload;
     request.userId = decoded.userId;
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {

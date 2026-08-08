@@ -9,6 +9,8 @@ process.env.JWT_SECRET = 'a'.repeat(32);
 process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
 process.env.CORS_ORIGINS = 'http://localhost:3000';
 process.env.LOG_LEVEL = 'fatal';
+process.env.RESEND_API_KEY = 'test-resend-key';
+process.env.EMAIL_FROM = 'test@example.com';
 
 describe('App wiring - all modules registered', () => {
   let app: FastifyInstance;

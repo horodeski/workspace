@@ -9,11 +9,28 @@ import { ConflictError, UnauthorizedError } from '../../shared/errors/errors.js'
 vi.mock('./auth.repository.js', () => ({
   authRepository: {
     findUserByEmail: vi.fn(),
+    findUserById: vi.fn(),
     createUser: vi.fn(),
     findRefreshToken: vi.fn(),
     createRefreshToken: vi.fn(),
     revokeRefreshToken: vi.fn(),
+    revokeAllUserRefreshTokens: vi.fn(),
+    createEmailVerification: vi.fn().mockResolvedValue({ id: 'ev-1' }),
+    countRecentVerifications: vi.fn().mockResolvedValue(0),
+    findValidVerification: vi.fn(),
+    markVerificationUsed: vi.fn(),
+    setEmailVerified: vi.fn(),
   },
+}));
+
+vi.mock('./login-limiter.js', () => ({
+  isAccountLocked: vi.fn().mockReturnValue(false),
+  recordFailedAttempt: vi.fn(),
+  resetAttempts: vi.fn(),
+}));
+
+vi.mock('../../shared/email/email.service.js', () => ({
+  sendVerificationEmail: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock('../boards/boards.repository.js', () => ({
@@ -25,6 +42,9 @@ vi.mock('../boards/boards.repository.js', () => ({
 const deps: AuthServiceDeps = {
   jwtSecret: 'test-jwt-secret-that-is-at-least-32-chars',
   jwtRefreshSecret: 'test-jwt-refresh-secret-at-least-32-chars',
+  bcryptRounds: 10,
+  resendApiKey: 'test-resend-key',
+  emailFrom: 'test@example.com',
 };
 
 describe('authService', () => {
@@ -38,17 +58,22 @@ describe('authService', () => {
         id: 'user-123',
         email: 'test@example.com',
         passwordHash: 'hashed',
+        name: 'Test User',
+        avatarPath: null,
         createdAt: new Date('2024-01-01'),
         updatedAt: new Date('2024-01-01'),
+        emailVerified: false,
       };
 
       vi.mocked(authRepository.createUser).mockResolvedValue(mockUser);
 
-      const result = await authService.register('test@example.com', 'password123', deps);
+      const result = await authService.register('test@example.com', 'password123', deps, 'Test User');
 
       expect(result).toEqual({
         id: 'user-123',
         email: 'test@example.com',
+        name: 'Test User',
+        avatarUrl: null,
         createdAt: new Date('2024-01-01'),
       });
 
@@ -64,11 +89,11 @@ describe('authService', () => {
       vi.mocked(authRepository.createUser).mockRejectedValue(prismaError);
 
       await expect(
-        authService.register('dup@example.com', 'password123', deps)
+        authService.register('dup@example.com', 'password123', deps, 'Test User')
       ).rejects.toThrow(ConflictError);
 
       await expect(
-        authService.register('dup@example.com', 'password123', deps)
+        authService.register('dup@example.com', 'password123', deps, 'Test User')
       ).rejects.toThrow('Email já cadastrado');
     });
 
@@ -76,7 +101,7 @@ describe('authService', () => {
       vi.mocked(authRepository.createUser).mockRejectedValue(new Error('DB connection failed'));
 
       await expect(
-        authService.register('test@example.com', 'password123', deps)
+        authService.register('test@example.com', 'password123', deps, 'Test User')
       ).rejects.toThrow('DB connection failed');
     });
 
@@ -85,13 +110,16 @@ describe('authService', () => {
         id: 'user-123',
         email: 'test@example.com',
         passwordHash: 'hashed',
+        name: 'Test User',
+        avatarPath: null,
         createdAt: new Date('2024-01-01'),
         updatedAt: new Date('2024-01-01'),
+        emailVerified: false,
       };
 
       vi.mocked(authRepository.createUser).mockResolvedValue(mockUser);
 
-      await authService.register('test@example.com', 'password123', deps);
+      await authService.register('test@example.com', 'password123', deps, 'Test User');
 
       expect(boardsRepository.createBoard).toHaveBeenCalledWith('user-123', 'Meu Quadro');
     });
@@ -101,18 +129,23 @@ describe('authService', () => {
         id: 'user-456',
         email: 'test2@example.com',
         passwordHash: 'hashed',
+        name: 'Test User',
+        avatarPath: null,
         createdAt: new Date('2024-01-01'),
         updatedAt: new Date('2024-01-01'),
+        emailVerified: false,
       };
 
       vi.mocked(authRepository.createUser).mockResolvedValue(mockUser);
       vi.mocked(boardsRepository.createBoard).mockRejectedValue(new Error('DB timeout'));
 
-      const result = await authService.register('test2@example.com', 'password123', deps);
+      const result = await authService.register('test2@example.com', 'password123', deps, 'Test User');
 
       expect(result).toEqual({
         id: 'user-456',
         email: 'test2@example.com',
+        name: 'Test User',
+        avatarUrl: null,
         createdAt: new Date('2024-01-01'),
       });
     });
@@ -123,6 +156,9 @@ describe('authService', () => {
       id: 'user-456',
       email: 'user@example.com',
       passwordHash: '',
+      name: 'Login User',
+      avatarPath: null,
+      emailVerified: true,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -148,7 +184,7 @@ describe('authService', () => {
       expect(result.refreshToken).toBeDefined();
 
       // Verify access token contains userId
-      const decoded = jwt.verify(result.accessToken, deps.jwtSecret) as { userId: string };
+      const decoded = jwt.verify(result.accessToken, deps.jwtSecret, { issuer: 'workspace-app', audience: 'workspace-api' }) as { userId: string };
       expect(decoded.userId).toBe('user-456');
 
       // Verify refresh token stored in DB
@@ -188,7 +224,7 @@ describe('authService', () => {
   describe('refresh', () => {
     it('should rotate tokens and return new pair', async () => {
       const userId = 'user-789';
-      const oldToken = jwt.sign({ userId }, deps.jwtRefreshSecret, { expiresIn: '7d' });
+      const oldToken = jwt.sign({ userId }, deps.jwtRefreshSecret, { expiresIn: '7d', issuer: 'workspace-app', audience: 'workspace-api' });
 
       vi.mocked(authRepository.findRefreshToken).mockResolvedValue({
         id: 'rt-old',
@@ -222,12 +258,12 @@ describe('authService', () => {
       );
 
       // New access token should contain userId
-      const decoded = jwt.verify(result.accessToken, deps.jwtSecret) as { userId: string };
+      const decoded = jwt.verify(result.accessToken, deps.jwtSecret, { issuer: 'workspace-app', audience: 'workspace-api' }) as { userId: string };
       expect(decoded.userId).toBe(userId);
     });
 
     it('should throw UnauthorizedError for invalid token signature', async () => {
-      const badToken = jwt.sign({ userId: 'user-1' }, 'wrong-secret-key-blah-blah', { expiresIn: '7d' });
+      const badToken = jwt.sign({ userId: 'user-1' }, 'wrong-secret-key-blah-blah', { expiresIn: '7d', issuer: 'workspace-app', audience: 'workspace-api' });
 
       await expect(
         authService.refresh(badToken, deps)
@@ -239,7 +275,7 @@ describe('authService', () => {
     });
 
     it('should throw UnauthorizedError for token not found in DB', async () => {
-      const validToken = jwt.sign({ userId: 'user-1' }, deps.jwtRefreshSecret, { expiresIn: '7d' });
+      const validToken = jwt.sign({ userId: 'user-1' }, deps.jwtRefreshSecret, { expiresIn: '7d', issuer: 'workspace-app', audience: 'workspace-api' });
       vi.mocked(authRepository.findRefreshToken).mockResolvedValue(null);
 
       await expect(
@@ -247,9 +283,9 @@ describe('authService', () => {
       ).rejects.toThrow('Token inválido ou revogado');
     });
 
-    it('should throw UnauthorizedError for already revoked token', async () => {
+    it('should throw UnauthorizedError for already revoked token and revoke all user tokens', async () => {
       const userId = 'user-1';
-      const revokedToken = jwt.sign({ userId }, deps.jwtRefreshSecret, { expiresIn: '7d' });
+      const revokedToken = jwt.sign({ userId }, deps.jwtRefreshSecret, { expiresIn: '7d', issuer: 'workspace-app', audience: 'workspace-api' });
 
       vi.mocked(authRepository.findRefreshToken).mockResolvedValue({
         id: 'rt-revoked',
@@ -262,6 +298,24 @@ describe('authService', () => {
 
       await expect(
         authService.refresh(revokedToken, deps)
+      ).rejects.toThrow('Token inválido ou revogado');
+    });
+
+    it('should throw UnauthorizedError for expired token in DB', async () => {
+      const userId = 'user-1';
+      const expiredDbToken = jwt.sign({ userId }, deps.jwtRefreshSecret, { expiresIn: '7d', issuer: 'workspace-app', audience: 'workspace-api' });
+
+      vi.mocked(authRepository.findRefreshToken).mockResolvedValue({
+        id: 'rt-expired',
+        token: expiredDbToken,
+        userId,
+        expiresAt: new Date(Date.now() - 1000), // expired in DB
+        revokedAt: null,
+        createdAt: new Date(),
+      });
+
+      await expect(
+        authService.refresh(expiredDbToken, deps)
       ).rejects.toThrow('Token inválido ou revogado');
     });
   });
