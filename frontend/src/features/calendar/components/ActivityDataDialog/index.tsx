@@ -293,7 +293,6 @@ export function ActivityDataDialog(props: ActivityDataDialogProps) {
                   ? handleEditChange('startTime', e.target.value || null)
                   : setStartTime(e.target.value)
               }
-              onClick={!isEditMode ? () => setDurationOpen(true) : undefined}
             />
             <DurationField
               value={currentDuration}
